@@ -1,0 +1,122 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import AdSense from '@/components/AdSense.astro';
+import NewsletterForm from '@/components/NewsletterForm.astro';
+import { getCollection } from 'astro:content';
+import { formatDateBR } from '@/utils/date';
+
+export async function getStaticPaths() {
+  const allNews = await getCollection('news');
+  return allNews.map(article => ({
+    params: { slug: article.data.slug },
+    props: { article },
+  }));
+}
+
+const { article } = Astro.props;
+const { data } = article;
+
+const allNews = await getCollection('news');
+const related = allNews
+  .filter(a => a.data.slug !== data.slug && a.data.category === data.category)
+  .slice(0, 3);
+
+const categoryLabels: Record<string, string> = {
+  'ia-automacao': 'IA & Automação',
+  'negocios-tech': 'Negócios & Tech',
+  'startups': 'Startups',
+  'marketing-tech': 'Marketing & Tech',
+  'tech-geral': 'Tech Geral',
+};
+---
+
+<Layout
+  title={`${data.title} | i-a-trend`}
+  description={data.excerpt}
+  image={data.imageUrl}
+  url={`/noticia/${data.slug}`}
+  type="article"
+  publishedTime={data.publishedAt}
+  section={categoryLabels[data.category] || data.category}
+  tags={data.tags}
+>
+  <Header slot="header" />
+
+  <article class="container py-8 max-w-4xl">
+    <header class="mb-8">
+      <div class="flex items-center gap-3 text-sm text-gray-500 mb-4">
+        <a href={`/categoria/${data.category}`} class="font-medium text-primary-600 hover:text-primary-700">
+          {categoryLabels[data.category] || data.category}
+        </a>
+        <span>•</span>
+        <time datetime={data.publishedAt}>{formatDateBR(data.publishedAt, { short: true })}</time>
+        <span>•</span>
+        <span class="text-gray-400">Fonte: {data.sourceName}</span>
+      </div>
+
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-4 text-balance">
+        {data.title}
+      </h1>
+
+      <p class="text-xl text-gray-600 leading-relaxed">
+        {data.excerpt}
+      </p>
+
+      {data.tags.length > 0 && (
+        <div class="flex flex-wrap gap-2 mt-4">
+          {data.tags.map(tag => (
+            <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </header>
+
+    <AdSense />
+
+    <div class="prose-custom max-w-none">
+      <p class="lead text-lg text-gray-500 mb-6">
+        Leia a matéria completa em:
+        <a
+          href={data.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer nofollow sponsored"
+          class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
+        >
+          {data.sourceName} →
+        </a>
+      </p>
+      <hr class="my-8 border-gray-200" />
+    </div>
+
+    <AdSense />
+
+    {related.length > 0 && (
+      <section class="mt-12">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Relacionados</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {related.map(a => (
+            <a
+              href={`/noticia/${a.data.slug}`}
+              class="group p-4 rounded-xl border border-gray-200 hover:border-primary-300 transition-all"
+            >
+              <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
+                {a.data.title}
+              </h3>
+              <p class="text-sm text-gray-500 mt-2 line-clamp-2">{a.data.excerpt}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <section class="my-12">
+      <NewsletterForm />
+    </section>
+  </article>
+
+  <Footer slot="footer" />
+</Layout>

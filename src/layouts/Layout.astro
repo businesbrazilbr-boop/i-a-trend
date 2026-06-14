@@ -1,0 +1,83 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  url?: string;
+  type?: 'website' | 'article';
+  publishedTime?: string;
+  modifiedTime?: string;
+  author?: string;
+  section?: string;
+  tags?: string[];
+}
+
+const {
+  title,
+  description = 'Blog sobre Automação com IA para Negócios no Brasil. Notícias, ferramentas, casos de uso e tendências de inteligência artificial aplicada.',
+  image = '/og-default.png',
+  url = 'https://i-a-trend.com',
+  type = 'website',
+  publishedTime,
+  modifiedTime,
+  author = 'i-a-trend',
+  section,
+  tags = [],
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, 'https://i-a-trend.com').toString();
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonicalURL} />
+
+    <title>{title} | i-a-trend</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(image, 'https://i-a-trend.com').toString()} />
+    <meta property="og:site_name" content="i-a-trend" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalURL} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(image, 'https://i-a-trend.com').toString()} />
+
+    {publishedTime && <meta property="article:published_time" content={publishedTime} />}
+    {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+    {author && <meta property="article:author" content={author} />}
+    {section && <meta property="article:section" content={section} />}
+    {tags.length > 0 && tags.map(tag => <meta property="article:tag" content={tag} />)}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title="i-a-trend RSS Feed" href="/rss.xml" />
+
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-PLACEHOLDER"
+      crossOrigin="anonymous"
+    ></script>
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <slot name="header" />
+    <main class="flex-1 w-full">
+      <slot />
+    </main>
+    <slot name="footer" />
+  </body>
+</html>

@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #1f2937;
+    --color-muted: #6b7280;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-900 antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::selection {
+    @apply bg-primary-500/20 text-primary-900;
+  }
+}
+
+@layer components {
+  .prose-custom {
+    @apply text-gray-700 leading-relaxed;
+  }
+
+  .prose-custom h2 {
+    @apply text-2xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b border-gray-200;
+  }
+
+  .prose-custom h3 {
+    @apply text-xl font-semibold text-gray-900 mt-6 mb-3;
+  }
+
+  .prose-custom p {
+    @apply mb-4 text-lg;
+  }
+
+  .prose-custom a {
+    @apply text-primary-600 hover:text-primary-700 underline underline-offset-2;
+  }
+
+  .prose-custom ul {
+    @apply list-disc list-inside mb-4 space-y-2;
+  }
+
+  .prose-custom ol {
+    @apply list-decimal list-inside mb-4 space-y-2;
+  }
+
+  .prose-custom blockquote {
+    @apply border-l-4 border-primary-500 pl-4 italic text-gray-600 my-4;
+  }
+
+  .prose-custom code {
+    @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  .prose-custom pre {
+    @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4;
+  }
+
+  .prose-custom pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .prose-custom img {
+    @apply rounded-lg my-6 w-full h-auto;
+  }
+
+  .prose-custom strong {
+    @apply font-semibold text-gray-900;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

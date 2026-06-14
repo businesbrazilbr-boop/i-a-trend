@@ -1,0 +1,33 @@
+name = "worker-ias"
+main = "./src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "IAS_DB"
+database_name = "ias-news"
+database_id = "SEU_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "IAS_CACHE"
+id = "SEU_KV_NAMESPACE_ID"
+
+[vars]
+GITHUB_REPO = "businesbrazilbr-boop/i-a-trend"
+GITHUB_BRANCH = "main"
+DAILY_LIMIT = "10"
+CONTENT_PATH = "src/content/news"
+SITE_URL = "https://i-a-trend.com"
+
+[triggers]
+crons = ["*/30 * * * *"]
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+[[services]]
+binding = "PAGES"
+service = "i-a-trend"

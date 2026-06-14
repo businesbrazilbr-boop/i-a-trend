@@ -1,0 +1,62 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+import NewsCard from '@/components/NewsCard.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const categories = [
+    'ia-automacao',
+    'negocios-tech',
+    'startups',
+    'marketing-tech',
+    'tech-geral',
+  ];
+  return categories.map(slug => ({ params: { slug } }));
+}
+
+const { slug } = Astro.params;
+const allNews = await getCollection('news');
+const filtered = allNews
+  .filter(a => a.data.category === slug)
+  .sort((a, b) => new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime());
+
+const labels: Record<string, string> = {
+  'ia-automacao': '🤖 IA & Automação',
+  'negocios-tech': '💼 Negócios & Tech',
+  'startups': '🚀 Startups',
+  'marketing-tech': '📢 Marketing & Tech',
+  'tech-geral': '📡 Tech Geral',
+};
+
+const descs: Record<string, string> = {
+  'ia-automacao': 'Ferramentas, LLMs, RPA, automação inteligente para negócios brasileiros.',
+  'negocios-tech': 'Transformação digital, fintechs, soluções corporativas com IA.',
+  'startups': 'Novos negócios, scale-ups, investimentos e inovação no Brasil.',
+  'marketing-tech': 'Marketing digital, IA criativa, análise de dados e anúncios inteligentes.',
+  'tech-geral': 'Tecnologia em geral, tendências e inovações do mercado brasileiro.',
+};
+---
+
+<Layout title={`${labels[slug] || slug} | i-a-trend`} description={descs[slug] || ''} url={`/categoria/${slug}`}>
+  <Header slot="header" />
+
+  <section class="container py-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">{labels[slug] || slug}</h1>
+    <p class="text-gray-600 mb-8">{descs[slug] || ''}</p>
+
+    {filtered.length > 0 ? (
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map(article => <NewsCard article={article} />)}
+      </div>
+    ) : (
+      <div class="text-center py-16 text-gray-400">
+        <p class="text-lg">Nenhuma notícia nesta categoria ainda.</p>
+        <p class="text-sm mt-2">Aguardando o Worker popular o conteúdo...</p>
+      </div>
+    )}
+  </section>
+
+  <Footer slot="footer" />
+</Layout>

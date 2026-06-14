@@ -1,0 +1,34 @@
+<footer class="bg-gray-900 text-gray-300 mt-16">
+  <div class="container mx-auto py-10">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div>
+        <h3 class="text-white font-bold text-lg mb-3">i-a-trend</h3>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          Blog sobre automação com inteligência artificial para negócios no Brasil.
+          As tendências, ferramentas e casos de uso que você precisa conhecer.
+        </p>
+      </div>
+      <div>
+        <h4 class="text-white font-semibold mb-3">Categorias</h4>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/categoria/ia-automacao" class="hover:text-primary-400 transition-colors">IA & Automação</a></li>
+          <li><a href="/categoria/negocios-tech" class="hover:text-primary-400 transition-colors">Negócios & Tech</a></li>
+          <li><a href="/categoria/startups" class="hover:text-primary-400 transition-colors">Startups</a></li>
+          <li><a href="/categoria/marketing-tech" class="hover:text-primary-400 transition-colors">Marketing & Tech</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-white font-semibold mb-3">Links</h4>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/rss.xml" class="hover:text-primary-400 transition-colors">RSS Feed</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-8 pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+      <p>&copy; {new Date().getFullYear()} i-a-trend. Todos os direitos reservados.</p>
+      <p>Feito com 💙 para o ecossistema de IA brasileiro</p>
+    </div>
+  </div>
+</footer>
+
+<slot />

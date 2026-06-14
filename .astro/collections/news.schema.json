@@ -1,0 +1,75 @@
+{
+  "$ref": "#/definitions/news",
+  "definitions": {
+    "news": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "excerpt": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sourceName": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "ia-automacao",
+            "negocios-tech",
+            "startups",
+            "marketing-tech",
+            "tech-geral"
+          ]
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "author": {
+          "type": "string"
+        },
+        "isOriginal": {
+          "type": "boolean",
+          "default": false
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "slug",
+        "excerpt",
+        "sourceUrl",
+        "sourceName",
+        "category",
+        "publishedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
