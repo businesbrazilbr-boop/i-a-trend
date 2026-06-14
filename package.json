@@ -5,7 +5,7 @@
   "description": "Blog de Automação com IA para Negócios - Português Brasileiro",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && echo _worker.js > dist/.assetsignore",
     "preview": "astro preview",
     "astro": "astro",
     "deploy": "npx wrangler pages deploy dist --project-name=i-a-trend"
