@@ -15,7 +15,7 @@ CONTENT_PATH = "src/content/news"
 SITE_URL = "https://i-a-trend.com"
 ENVIRONMENT = "production"
 
-[d1_databases]
+[[d1_databases]]
 binding = "IAS_DB"
 database_name = "ias-news"
 database_id = "2b5f1f94-cc05-4f29-890c-6785071caf84"
