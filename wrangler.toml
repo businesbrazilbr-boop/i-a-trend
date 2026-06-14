@@ -5,18 +5,3 @@ compatibility_flags = ["nodejs_compat"]
 
 [build]
 command = "npm run build"
-
-[build.environment]
-NODE_VERSION = "20"
-
-[[d1_databases]]
-binding = "IAS_DB"
-database_name = "ias-news"
-database_id = "SEU_D1_DATABASE_ID"
-
-[[kv_namespaces]]
-binding = "IAS_CACHE"
-id = "SEU_KV_NAMESPACE_ID"
-
-[env.production]
-vars = { SITE_URL = "https://i-a-trend.com" }
