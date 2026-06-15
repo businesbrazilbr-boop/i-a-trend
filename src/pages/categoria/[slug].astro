@@ -22,6 +22,9 @@ const filtered = allNews
   .filter(a => a.data.category === slug)
   .sort((a, b) => new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime());
 
+const featured = filtered[0];
+const rest = filtered.slice(1);
+
 const labels: Record<string, string> = {
   'ia-automacao': '🤖 IA & Automação',
   'negocios-tech': '💼 Negócios & Tech',
@@ -43,13 +46,27 @@ const descs: Record<string, string> = {
   <Header slot="header" />
 
   <section class="container py-8">
+    <div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+      <a href="/" class="hover:text-primary-600 transition-colors">Home</a>
+      <span>/</span>
+      <span class="text-gray-600 font-medium">{labels[slug] || slug}</span>
+    </div>
+
     <h1 class="text-3xl font-bold text-gray-900 mb-2">{labels[slug] || slug}</h1>
     <p class="text-gray-600 mb-8">{descs[slug] || ''}</p>
 
     {filtered.length > 0 ? (
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map(article => <NewsCard article={article} />)}
-      </div>
+      <>
+        {featured && (
+          <div class="mb-8">
+            <NewsCard article={featured} variant="hero" />
+          </div>
+        )}
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {rest.map(article => <NewsCard article={article} />)}
+        </div>
+      </>
     ) : (
       <div class="text-center py-16 text-gray-400">
         <p class="text-lg">Nenhuma notícia nesta categoria ainda.</p>

@@ -4,18 +4,63 @@ import type { CollectionEntry } from 'astro:content';
 
 interface Props {
   article: CollectionEntry<'news'>;
-  variant?: 'default' | 'compact' | 'featured';
+  variant?: 'hero' | 'featured' | 'default' | 'compact' | 'sidebar';
 }
 
 const { article, variant = 'default' } = Astro.props;
 const { data } = article;
+
+function catLabel(slug: string): string {
+  const labels: Record<string, string> = {
+    'ia-automacao': 'IA & Automação',
+    'negocios-tech': 'Negócios & Tech',
+    'startups': 'Startups',
+    'marketing-tech': 'Marketing',
+    'tech-geral': 'Tech Geral',
+  };
+  return labels[slug] || slug;
+}
 ---
 
 {
-  variant === 'featured' ? (
+  variant === 'hero' ? (
     <a
       href={`/noticia/${data.slug}`}
-      class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-900 via-primary-800 to-accent-900 min-h-[400px] sm:min-h-[480px] flex items-end"
+      class="group grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-6 rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-primary-300 hover:shadow-lg transition-all"
+    >
+      <div class="aspect-[16/9] lg:aspect-auto bg-gray-100 overflow-hidden lg:min-h-[340px]">
+        {data.imageUrl ? (
+          <img
+            src={data.imageUrl}
+            alt={data.title}
+            class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            loading="eager"
+          />
+        ) : (
+          <div class="w-full h-full flex items-center justify-center text-gray-300 text-6xl">📰</div>
+        )}
+      </div>
+      <div class="p-5 lg:p-6 flex flex-col justify-center">
+        <span class="text-xs font-semibold uppercase tracking-wider text-primary-600 mb-2">
+          {catLabel(data.category)}
+        </span>
+        <h2 class="text-xl lg:text-2xl font-bold text-gray-900 group-hover:text-primary-600 transition-colors leading-tight mb-3">
+          {data.title}
+        </h2>
+        <p class="text-sm text-gray-600 line-clamp-3 mb-4">
+          {data.excerpt}
+        </p>
+        <div class="flex items-center gap-3 text-xs text-gray-400">
+          <span>{data.sourceName}</span>
+          <span>•</span>
+          <time datetime={data.publishedAt}>{getTimeAgo(data.publishedAt)}</time>
+        </div>
+      </div>
+    </a>
+  ) : variant === 'featured' ? (
+    <a
+      href={`/noticia/${data.slug}`}
+      class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-900 via-primary-800 to-accent-900 min-h-[360px] sm:min-h-[420px] flex items-end"
     >
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10" />
       {data.imageUrl && (
@@ -27,19 +72,14 @@ const { data } = article;
         />
       )}
       <div class="relative z-20 p-6 sm:p-8 w-full">
-        <span class="inline-block px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-full bg-primary-500/20 text-primary-200 backdrop-blur-sm border border-primary-400/30 mb-4">
-          {data.category === 'ia-automacao' ? '🤖 IA & Automação' :
-           data.category === 'negocios-tech' ? '💼 Negócios & Tech' :
-           data.category === 'startups' ? '🚀 Startups' :
-           data.category === 'marketing-tech' ? '📢 Marketing' : '📡 Tech Geral'}
+        <span class="inline-block px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-full bg-primary-500/20 text-primary-200 backdrop-blur-sm border border-primary-400/30 mb-3">
+          {catLabel(data.category)}
         </span>
-        <h2 class="text-2xl sm:text-3xl font-bold text-white leading-tight mb-3 group-hover:text-primary-200 transition-colors">
+        <h2 class="text-xl sm:text-2xl font-bold text-white leading-tight mb-2 group-hover:text-primary-200 transition-colors">
           {data.title}
         </h2>
-        <p class="text-gray-300 line-clamp-2 mb-3">
-          {data.excerpt}
-        </p>
-        <div class="flex items-center gap-4 text-sm text-gray-400">
+        <p class="text-sm text-gray-300 line-clamp-2 mb-2">{data.excerpt}</p>
+        <div class="flex items-center gap-3 text-xs text-gray-400">
           <span>{data.sourceName}</span>
           <span>•</span>
           <time datetime={data.publishedAt}>{getTimeAgo(data.publishedAt)}</time>
@@ -49,35 +89,54 @@ const { data } = article;
   ) : variant === 'compact' ? (
     <a
       href={`/noticia/${data.slug}`}
-      class="group flex gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors border border-gray-100 hover:border-primary-200"
+      class="group flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-gray-100 hover:border-primary-200"
     >
       {data.imageUrl && (
         <img
           src={data.imageUrl}
           alt=""
-          class="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+          class="w-16 h-16 rounded-lg object-cover flex-shrink-0"
           loading="lazy"
         />
       )}
       <div class="flex-1 min-w-0">
-        <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
+        <span class="text-xs text-primary-600 font-medium">{catLabel(data.category)}</span>
+        <h3 class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 mt-0.5">
           {data.title}
         </h3>
-        <p class="text-sm text-gray-500 mt-1 line-clamp-1">{data.excerpt}</p>
-        <div class="flex items-center gap-2 text-xs text-gray-400 mt-2">
+        <div class="flex items-center gap-2 text-xs text-gray-400 mt-1">
           <span>{data.sourceName}</span>
           <span>•</span>
           <time datetime={data.publishedAt}>{getTimeAgo(data.publishedAt)}</time>
         </div>
       </div>
     </a>
+  ) : variant === 'sidebar' ? (
+    <a
+      href={`/noticia/${data.slug}`}
+      class="group block py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 px-3 -mx-3 rounded-lg transition-colors"
+    >
+      <div class="flex items-start gap-2">
+        <span class="text-xs font-medium text-primary-600 whitespace-nowrap mt-0.5 shrink-0">
+          {catLabel(data.category)}
+        </span>
+        <h3 class="text-sm font-medium text-gray-800 group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug">
+          {data.title}
+        </h3>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-gray-400 mt-1 ml-[3.5rem]">
+        <time datetime={data.publishedAt} class="font-medium text-gray-500">{getTimeAgo(data.publishedAt)}</time>
+        <span>•</span>
+        <span>{data.sourceName}</span>
+      </div>
+    </a>
   ) : (
     <a
       href={`/noticia/${data.slug}`}
-      class="group flex flex-col rounded-xl border border-gray-200 hover:border-primary-300 overflow-hidden transition-all hover:shadow-lg"
+      class="group flex flex-col rounded-xl border border-gray-200 hover:border-primary-300 overflow-hidden transition-all hover:shadow-md"
     >
-      {data.imageUrl && (
-        <div class="aspect-video bg-gray-100 overflow-hidden">
+      {data.imageUrl ? (
+        <div class="aspect-[16/9] bg-gray-100 overflow-hidden">
           <img
             src={data.imageUrl}
             alt={data.title}
@@ -85,21 +144,22 @@ const { data } = article;
             loading="lazy"
           />
         </div>
+      ) : (
+        <div class="aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-300 text-4xl">
+          📰
+        </div>
       )}
-      <div class="p-5 flex-1 flex flex-col">
-        <div class="flex items-center gap-2 mb-3">
+      <div class="p-4 flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
           <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-200">
-            {data.category === 'ia-automacao' ? 'IA & Automação' :
-             data.category === 'negocios-tech' ? 'Negócios & Tech' :
-             data.category === 'startups' ? 'Startups' :
-             data.category === 'marketing-tech' ? 'Marketing' : 'Tech Geral'}
+            {catLabel(data.category)}
           </span>
           <span class="text-xs text-gray-400">{data.sourceName}</span>
         </div>
-        <h3 class="font-bold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 mb-2">
+        <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 mb-2 text-sm leading-snug">
           {data.title}
         </h3>
-        <p class="text-sm text-gray-600 line-clamp-2 mb-3 flex-1">
+        <p class="text-xs text-gray-600 line-clamp-2 mb-3 flex-1">
           {data.excerpt}
         </p>
         <time datetime={data.publishedAt} class="text-xs text-gray-400">

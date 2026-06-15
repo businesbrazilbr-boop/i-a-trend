@@ -4,119 +4,204 @@ import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import AdSense from '@/components/AdSense.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
-import { getCollection } from 'astro:content';
+import { getCollection, getEntry } from 'astro:content';
 import { formatDateBR } from '@/utils/date';
 
 export async function getStaticPaths() {
   const allNews = await getCollection('news');
   return allNews.map(article => ({
     params: { slug: article.data.slug },
-    props: { article },
   }));
 }
 
-const { article } = Astro.props;
-const { data } = article;
+const { slug } = Astro.params;
+const entry = await getEntry('news', slug!);
+
+let Content: any = null;
+let hasBody = false;
+let wordCount = 0;
+let readingTime = 1;
+
+if (entry) {
+  try {
+    const rendered = await entry.render();
+    Content = rendered.Content;
+    hasBody = entry.body && entry.body.trim().length > 20;
+    wordCount = entry.body ? entry.body.split(/\s+/).length : 0;
+    readingTime = Math.max(1, Math.ceil(wordCount / 200));
+  } catch (e) {
+    // render fallback
+  }
+}
+
+const data = entry?.data;
 
 const allNews = await getCollection('news');
-const related = allNews
-  .filter(a => a.data.slug !== data.slug && a.data.category === data.category)
-  .slice(0, 3);
+const related = data
+  ? allNews
+      .filter(a => a.data.slug !== data.slug && a.data.category === data.category)
+      .slice(0, 3)
+  : [];
 
-const categoryLabels: Record<string, string> = {
-  'ia-automacao': 'IA & Automação',
-  'negocios-tech': 'Negócios & Tech',
-  'startups': 'Startups',
-  'marketing-tech': 'Marketing & Tech',
-  'tech-geral': 'Tech Geral',
+const categoryLabels: Record<string, { label: string; emoji: string }> = {
+  'ia-automacao': { label: 'IA & Automação', emoji: '🤖' },
+  'negocios-tech': { label: 'Negócios & Tech', emoji: '💼' },
+  'startups': { label: 'Startups', emoji: '🚀' },
+  'marketing-tech': { label: 'Marketing & Tech', emoji: '📢' },
+  'tech-geral': { label: 'Tech Geral', emoji: '📡' },
 };
+
+const catInfo = data ? (categoryLabels[data.category] || { label: data.category, emoji: '📰' }) : { label: '', emoji: '📰' };
 ---
 
 <Layout
-  title={`${data.title} | i-a-trend`}
-  description={data.excerpt}
-  image={data.imageUrl}
-  url={`/noticia/${data.slug}`}
+  title={data ? `${data.title} | i-a-trend` : 'i-a-trend'}
+  description={data?.excerpt || ''}
+  image={data?.imageUrl}
+  url={data ? `/noticia/${data.slug}` : '/'}
   type="article"
-  publishedTime={data.publishedAt}
-  section={categoryLabels[data.category] || data.category}
-  tags={data.tags}
+  publishedTime={data?.publishedAt}
+  section={catInfo.label}
+  tags={data?.tags || []}
 >
   <Header slot="header" />
 
-  <article class="container py-8 max-w-4xl">
-    <header class="mb-8">
-      <div class="flex items-center gap-3 text-sm text-gray-500 mb-4">
-        <a href={`/categoria/${data.category}`} class="font-medium text-primary-600 hover:text-primary-700">
-          {categoryLabels[data.category] || data.category}
-        </a>
-        <span>•</span>
-        <time datetime={data.publishedAt}>{formatDateBR(data.publishedAt, { short: true })}</time>
-        <span>•</span>
-        <span class="text-gray-400">Fonte: {data.sourceName}</span>
+  {data ? (
+    <article class="container py-8 max-w-4xl">
+      <!-- Cabeçalho -->
+      <header class="mb-6">
+        <div class="flex flex-wrap items-center gap-3 text-sm mb-4">
+          <a
+            href={`/categoria/${data.category}`}
+            class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors"
+          >
+            {catInfo.emoji} {catInfo.label}
+          </a>
+          <span class="text-gray-300">|</span>
+          <time datetime={data.publishedAt} class="text-gray-500">
+            {formatDateBR(data.publishedAt, { short: true })}
+          </time>
+          <span class="text-gray-300">|</span>
+          <span class="text-gray-400">{data.sourceName}</span>
+          {hasBody && (
+            <>
+              <span class="text-gray-300">|</span>
+              <span class="text-gray-400">{readingTime} min de leitura</span>
+            </>
+          )}
+        </div>
+
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-4 text-balance">
+          {data.title}
+        </h1>
+
+        <p class="text-lg sm:text-xl text-gray-600 leading-relaxed">
+          {data.excerpt}
+        </p>
+
+        {data.tags.length > 0 && (
+          <div class="flex flex-wrap gap-2 mt-4">
+            {data.tags.map(tag => (
+              <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <!-- Imagem principal -->
+      {data.imageUrl && (
+        <figure class="mb-8 -mx-4 sm:mx-0">
+          <img
+            src={data.imageUrl}
+            alt={data.title}
+            class="w-full rounded-xl sm:rounded-2xl max-h-[500px] object-cover"
+            loading="eager"
+          />
+        </figure>
+      )}
+
+      <AdSense />
+
+      <!-- Conteúdo -->
+      <div class="prose-custom max-w-none mt-8">
+        {Content && hasBody ? (
+          <div class="article-body text-gray-800 leading-relaxed space-y-4 text-[15px]">
+            <Content />
+          </div>
+        ) : (
+          <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <p class="text-gray-600 leading-relaxed mb-4">{data.excerpt}</p>
+            <p class="text-gray-500">
+              Leia a matéria completa em:
+              <a
+                href={data.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
+              >
+                {data.sourceName} →
+              </a>
+            </p>
+          </div>
+        )}
+
+        {hasBody && (
+          <div class="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <p class="text-sm text-gray-500">
+              Fonte original:
+              <a
+                href={data.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
+              >
+                {data.sourceName} →
+              </a>
+            </p>
+          </div>
+        )}
       </div>
 
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-4 text-balance">
-        {data.title}
-      </h1>
+      <AdSense />
 
-      <p class="text-xl text-gray-600 leading-relaxed">
-        {data.excerpt}
-      </p>
-
-      {data.tags.length > 0 && (
-        <div class="flex flex-wrap gap-2 mt-4">
-          {data.tags.map(tag => (
-            <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-              #{tag}
-            </span>
-          ))}
-        </div>
+      {related.length > 0 && (
+        <section class="mt-12">
+          <h2 class="text-lg font-bold text-gray-900 mb-5">Relacionados</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {related.map(a => (
+              <a
+                href={`/noticia/${a.data.slug}`}
+                class="group p-4 rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all"
+              >
+                {a.data.imageUrl && (
+                  <img
+                    src={a.data.imageUrl}
+                    alt=""
+                    class="w-full aspect-video object-cover rounded-lg mb-3"
+                    loading="lazy"
+                  />
+                )}
+                <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 text-sm">
+                  {a.data.title}
+                </h3>
+                <p class="text-xs text-gray-500 mt-2 line-clamp-2">{a.data.excerpt}</p>
+              </a>
+            ))}
+          </div>
+        </section>
       )}
-    </header>
 
-    <AdSense />
-
-    <div class="prose-custom max-w-none">
-      <p class="lead text-lg text-gray-500 mb-6">
-        Leia a matéria completa em:
-        <a
-          href={data.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer nofollow sponsored"
-          class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
-        >
-          {data.sourceName} →
-        </a>
-      </p>
-      <hr class="my-8 border-gray-200" />
-    </div>
-
-    <AdSense />
-
-    {related.length > 0 && (
-      <section class="mt-12">
-        <h2 class="text-2xl font-bold text-gray-900 mb-6">Relacionados</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {related.map(a => (
-            <a
-              href={`/noticia/${a.data.slug}`}
-              class="group p-4 rounded-xl border border-gray-200 hover:border-primary-300 transition-all"
-            >
-              <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
-                {a.data.title}
-              </h3>
-              <p class="text-sm text-gray-500 mt-2 line-clamp-2">{a.data.excerpt}</p>
-            </a>
-          ))}
-        </div>
+      <section class="my-12">
+        <NewsletterForm />
       </section>
-    )}
-
-    <section class="my-12">
-      <NewsletterForm />
-    </section>
-  </article>
+    </article>
+  ) : (
+    <div class="container py-16 text-center text-gray-400">
+      <p class="text-lg">Artigo não encontrado.</p>
+    </div>
+  )}
 
   <Footer slot="footer" />
 </Layout>

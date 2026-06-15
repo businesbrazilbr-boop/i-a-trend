@@ -6,7 +6,7 @@ import NewsCard from '@/components/NewsCard.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
 import AdSense from '@/components/AdSense.astro';
 import { getCollection } from 'astro:content';
-import { formatDateBR } from '@/utils/date';
+import { getTimeAgo } from '@/utils/date';
 
 const allNews = await getCollection('news');
 const sortedNews = allNews.sort((a, b) =>
@@ -14,68 +14,123 @@ const sortedNews = allNews.sort((a, b) =>
 );
 
 const featured = sortedNews[0];
-const latest = sortedNews.slice(1, 7);
-const rest = sortedNews.slice(7);
+const sidebarNews = sortedNews.slice(1, 7);
+const restNews = sortedNews.slice(7);
 
 const categories = [
-  { slug: 'ia-automacao', label: '🤖 IA & Automação', desc: 'Ferramentas, LLMs, RPA, automação inteligente' },
-  { slug: 'negocios-tech', label: '💼 Negócios & Tech', desc: 'Transformação digital, fintechs, corporativo' },
-  { slug: 'startups', label: '🚀 Startups', desc: 'Novos negócios, scale-ups, inovação' },
-  { slug: 'marketing-tech', label: '📢 Marketing & Tech', desc: 'Marketing digital, IA criativa, dados' },
+  { slug: 'ia-automacao', label: '🤖 IA & Automação' },
+  { slug: 'negocios-tech', label: '💼 Negócios & Tech' },
+  { slug: 'startups', label: '🚀 Startups' },
+  { slug: 'marketing-tech', label: '📢 Marketing & Tech' },
+  { slug: 'tech-geral', label: '📡 Tech Geral' },
 ];
+
+function getByCategory(slug: string) {
+  return restNews.filter(a => a.data.category === slug).slice(0, 6);
+}
 ---
 
-<Layout title="i-a-trend - Automação com IA para Negócios no Brasil" description="As 10 melhores notícias diárias sobre automação com inteligência artificial para negócios. Curadoria feita para o ecossistema brasileiro." url="/">
+<Layout
+  title="i-a-trend - Automação com IA para Negócios no Brasil"
+  description="As 10 melhores notícias diárias sobre automação com inteligência artificial para negócios. Curadoria feita para o ecossistema brasileiro."
+  url="/"
+>
   <Header slot="header" />
 
-  <!-- Hero Section -->
-  <section class="container py-8">
-    <div class="text-center mb-10">
-      <h1 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 text-balance">
-        Automação com <span class="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">IA</span> para Negócios
-      </h1>
-      <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-        As 10 notícias mais relevantes todo dia sobre inteligência artificial, automação e tecnologia para o mercado brasileiro.
-      </p>
-    </div>
+  <!-- Hero + Último Momento -->
+  <section class="container py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <!-- Hero principal: 3 colunas à esquerda -->
+      <div class="lg:col-span-3">
+        {featured && <NewsCard article={featured} variant="hero" />}
 
-    {featured && <NewsCard article={featured} variant="featured" />}
-  </section>
+        <!-- Grid de destaques secundários -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+          {sortedNews.slice(1, 3).map(a => <NewsCard article={a} variant="featured" />)}
+        </div>
+      </div>
 
-  <!-- Últimas Notícias -->
-  <section class="container py-8">
-    <h2 class="text-2xl font-bold text-gray-900 mb-6">Últimas</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {latest.map(article => <NewsCard article={article} />)}
+      <!-- Último Momento (sidebar) -->
+      <div class="lg:col-span-1">
+        <div class="rounded-xl border border-gray-200 bg-white sticky top-20">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider">Último Momento</h2>
+          </div>
+          <div class="divide-y divide-gray-100">
+            {sidebarNews.map(a => {
+              const { data } = a;
+              return (
+                <a
+                  href={`/noticia/${data.slug}`}
+                  class="group block py-3 px-4 hover:bg-primary-50/50 transition-colors"
+                >
+                  <div class="flex items-start gap-2">
+                    <span class="text-xs font-semibold text-primary-600 whitespace-nowrap mt-0.5 shrink-0">
+                      {data.category === 'ia-automacao' ? '🤖' :
+                       data.category === 'negocios-tech' ? '💼' :
+                       data.category === 'startups' ? '🚀' :
+                       data.category === 'marketing-tech' ? '📢' : '📡'}
+                    </span>
+                    <div>
+                      <h3 class="text-sm font-medium text-gray-800 group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug">
+                        {data.title}
+                      </h3>
+                      <span class="text-xs text-gray-400 mt-1 block">
+                        {getTimeAgo(data.publishedAt)}
+                      </span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   <AdSense />
 
-  <!-- Categorias -->
-  <section class="container py-8">
-    <h2 class="text-2xl font-bold text-gray-900 mb-6">Categorias</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {categories.map(cat => (
-        <a
-          href={`/categoria/${cat.slug}`}
-          class="group p-6 rounded-2xl border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all"
-        >
-          <h3 class="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors mb-1">
-            {cat.label}
-          </h3>
-          <p class="text-sm text-gray-500">{cat.desc}</p>
-        </a>
-      ))}
-    </div>
-  </section>
+  <!-- Seções por categoria -->
+  {categories.map(cat => {
+    const catArticles = getByCategory(cat.slug);
+    if (catArticles.length === 0) return null;
+    return (
+      <section class="container py-8">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="text-lg font-bold text-gray-900">{cat.label}</h2>
+          <a
+            href={`/categoria/${cat.slug}`}
+            class="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
+          >
+            Ver todas →
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {catArticles.map(a => <NewsCard article={a} />)}
+        </div>
+      </section>
+    );
+  })}
 
-  <!-- Mais notícias -->
-  <section class="container py-8">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {rest.map(article => <NewsCard article={article} variant="compact" />)}
-    </div>
-  </section>
+  <!-- Resto das notícias (se sobrarem) -->
+  {(() => {
+    const assigned = new Set<string>();
+    categories.forEach(cat => {
+      getByCategory(cat.slug).forEach(a => assigned.add(a.id));
+    });
+    assigned.add(featured?.id || '').add(sidebarNews[0]?.id || '').add(sidebarNews[1]?.id || '');
+    const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
+    if (overflow.length === 0) return null;
+    return (
+      <section class="container py-8">
+        <h2 class="text-lg font-bold text-gray-900 mb-5">Mais Notícias</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {overflow.map(a => <NewsCard article={a} variant="compact" />)}
+        </div>
+      </section>
+    );
+  })()}
 
   <section class="container py-8">
     <NewsletterForm />
