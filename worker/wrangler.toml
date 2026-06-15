@@ -20,5 +20,8 @@ binding = "IAS_DB"
 database_name = "ias-news"
 database_id = "2b5f1f94-cc05-4f29-890c-6785071caf84"
 
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["*/30 * * * *"]

@@ -95,6 +95,7 @@ export function generateMarkdown(article: {
   imageUrl: string | null;
   tags: string[];
   content: string;
+  contentFull?: string;
 }): string {
   const tagsYaml = article.tags.length > 0
     ? `\n${article.tags.map(t => `  - ${t}`).join('\n')}`
@@ -104,6 +105,12 @@ export function generateMarkdown(article: {
     ? `\nimageUrl: "${article.imageUrl}"`
     : '';
 
+  const contentFullYaml = article.contentFull
+    ? `\ncontentFull: |\n  ${article.contentFull.replace(/\n/g, '\n  ')}`
+    : '';
+
+  const bodyContent = article.contentFull || article.content;
+
   return `---
 title: "${article.title.replace(/"/g, '\\"')}"
 slug: "${article.slug}"
@@ -111,15 +118,15 @@ excerpt: "${article.excerpt.replace(/"/g, '\\"')}"
 sourceUrl: "${article.sourceUrl}"
 sourceName: "${article.sourceName}"
 category: "${article.category}"
-publishedAt: "${article.publishedAt}"${imageYaml}
+publishedAt: "${article.publishedAt}"${imageYaml}${contentFullYaml}
 tags:${tagsYaml}
 ---
 
-${article.content}
+${bodyContent}
 
 ---
 
-Fonte: [${article.sourceName}](${article.sourceUrl})
+*Fonte: [${article.sourceName}](${article.sourceUrl})*
 `;
 }
 

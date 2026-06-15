@@ -4,6 +4,7 @@ export interface ArticleRecord {
   slug: string;
   excerpt: string;
   content: string;
+  content_full: string | null;
   source_url: string;
   source_name: string;
   category: string;
@@ -40,6 +41,7 @@ export async function insertArticle(d1: D1Database, article: {
   slug: string;
   excerpt: string;
   content: string;
+  contentFull?: string;
   sourceUrl: string;
   sourceName: string;
   category: string;
@@ -48,14 +50,15 @@ export async function insertArticle(d1: D1Database, article: {
   tags: string[];
 }): Promise<void> {
   await d1.prepare(`
-    INSERT OR IGNORE INTO articles (id, title, slug, excerpt, content, source_url, source_name, category, published_at, image_url, tags, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT OR IGNORE INTO articles (id, title, slug, excerpt, content, content_full, source_url, source_name, category, published_at, image_url, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `).bind(
     article.id,
     article.title,
     article.slug,
     article.excerpt,
     article.content,
+    article.contentFull || null,
     article.sourceUrl,
     article.sourceName,
     article.category,
@@ -82,6 +85,7 @@ export async function initDatabase(d1: D1Database): Promise<void> {
       slug TEXT NOT NULL,
       excerpt TEXT,
       content TEXT,
+      content_full TEXT,
       source_url TEXT NOT NULL UNIQUE,
       source_name TEXT NOT NULL,
       category TEXT NOT NULL DEFAULT 'tech-geral',

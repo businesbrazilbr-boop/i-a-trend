@@ -1,5 +1,7 @@
 import { ulid } from 'ulid';
 import { fetchAndParseFeed } from './rss';
+import { scrapeArticle } from './content-scraper';
+import { rewriteWithAI } from './ai-rewriter';
 import {
   initDatabase,
   getTodayCount,
@@ -24,6 +26,7 @@ import { DAILY_LIMIT, CONTENT_PATH } from './constants';
 interface Env {
   IAS_DB: D1Database;
   IAS_CACHE: KVNamespace;
+  AI: any;
   GITHUB_TOKEN: string;
   GITHUB_REPO: string;
 }
@@ -110,14 +113,30 @@ export default {
       const isDuplicate = await findDuplicatesByTitle(env.IAS_DB, article.title);
       if (isDuplicate) continue;
 
+      let contentFull: string | undefined;
+
+      // Scrape e rewrite com IA para artigos com boa pontuação
+      if (article.score >= 15) {
+        console.log(`[i-a-trend] Scraping: "${article.title.slice(0, 50)}..."`);
+        const scraped = await scrapeArticle(article.sourceUrl);
+        if (scraped.textContent) {
+          contentFull = await rewriteWithAI(env.AI, article.title, scraped.textContent);
+          if (scraped.imageUrl && !article.imageUrl) {
+            (article as any).imageUrl = scraped.imageUrl;
+          }
+          await sleep(1000);
+        }
+      }
+
       const id = ulid();
       try {
         await insertArticle(env.IAS_DB, {
           id,
           ...article,
           tags: article.tags,
+          contentFull,
         });
-        selected.push(article);
+        selected.push({ ...article, content: contentFull || article.content });
         added++;
       } catch (e) {
         console.error(`[i-a-trend] Erro ao salvar artigo "${article.title}":`, e);

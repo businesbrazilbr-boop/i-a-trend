@@ -24,6 +24,7 @@ interface ParsedArticle {
   tags: string[];
   score: number;
   content: string;
+  contentFull?: string;
 }
 
 const parser = new Parser({

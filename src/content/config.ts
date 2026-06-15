@@ -19,6 +19,7 @@ const news = defineCollection({
     publishedAt: z.string().datetime({ offset: true }),
     imageUrl: z.string().url().optional(),
     tags: z.array(z.string()).default([]),
+    contentFull: z.string().optional(),
     author: z.string().optional(),
     isOriginal: z.boolean().default(false),
   }),
