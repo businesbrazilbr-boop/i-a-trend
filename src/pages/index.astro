@@ -28,6 +28,15 @@ const categories = [
 function getByCategory(slug: string) {
   return restNews.filter(a => a.data.category === slug).slice(0, 6);
 }
+
+const assigned = new Set<string>();
+categories.forEach(cat => {
+  getByCategory(cat.slug).forEach(a => assigned.add(a.id));
+});
+if (featured) assigned.add(featured.id);
+if (sidebarNews[0]) assigned.add(sidebarNews[0].id);
+if (sidebarNews[1]) assigned.add(sidebarNews[1].id);
+const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
 ---
 
 <Layout
@@ -114,23 +123,14 @@ function getByCategory(slug: string) {
   })}
 
   <!-- Resto das notícias (se sobrarem) -->
-  {(() => {
-    const assigned = new Set<string>();
-    categories.forEach(cat => {
-      getByCategory(cat.slug).forEach(a => assigned.add(a.id));
-    });
-    assigned.add(featured?.id || '').add(sidebarNews[0]?.id || '').add(sidebarNews[1]?.id || '');
-    const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
-    if (overflow.length === 0) return null;
-    return (
-      <section class="container py-8">
-        <h2 class="text-lg font-bold text-gray-900 mb-5">Mais Notícias</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {overflow.map(a => <NewsCard article={a} variant="compact" />)}
-        </div>
-      </section>
-    );
-  })()}
+  {overflow.length > 0 && (
+    <section class="container py-8">
+      <h2 class="text-lg font-bold text-gray-900 mb-5">Mais Notícias</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {overflow.map(a => <NewsCard article={a} variant="compact" />)}
+      </div>
+    </section>
+  )}
 
   <section class="container py-8">
     <NewsletterForm />
