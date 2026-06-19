@@ -3,24 +3,12 @@ import Layout from '@/layouts/Layout.astro';
 import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import NewsCard from '@/components/NewsCard.astro';
-import { getCollection } from 'astro:content';
+import { getArticlesByCategory, getDB } from '@/utils/d1';
 
-export async function getStaticPaths() {
-  const categories = [
-    'ia-automacao',
-    'negocios-tech',
-    'startups',
-    'marketing-tech',
-    'tech-geral',
-  ];
-  return categories.map(slug => ({ params: { slug } }));
-}
-
+const db = getDB(Astro);
 const { slug } = Astro.params;
-const allNews = await getCollection('news');
-const filtered = allNews
-  .filter(a => a.data.category === slug)
-  .sort((a, b) => new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime());
+
+const filtered = slug && db ? await getArticlesByCategory(db, slug) : [];
 
 const featured = filtered[0];
 const rest = filtered.slice(1);
@@ -42,7 +30,11 @@ const descs: Record<string, string> = {
 };
 ---
 
-<Layout title={`${labels[slug] || slug} | i-a-trend`} description={descs[slug] || ''} url={`/categoria/${slug}`}>
+<Layout
+  title={`${labels[slug] || slug} | i-a-trend`}
+  description={descs[slug] || ''}
+  url={`/categoria/${slug}`}
+>
   <Header slot="header" />
 
   <section class="container py-8">
@@ -59,12 +51,11 @@ const descs: Record<string, string> = {
       <>
         {featured && (
           <div class="mb-8">
-            <NewsCard article={featured} variant="hero" />
+            <NewsCard article={featured as any} variant="hero" />
           </div>
         )}
-
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {rest.map(article => <NewsCard article={article} />)}
+          {rest.map(article => <NewsCard article={article as any} />)}
         </div>
       </>
     ) : (

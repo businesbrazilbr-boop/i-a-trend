@@ -48,6 +48,9 @@
           },
           "default": []
         },
+        "contentFull": {
+          "type": "string"
+        },
         "author": {
           "type": "string"
         },

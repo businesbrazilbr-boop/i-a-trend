@@ -1,9 +1,10 @@
-import { getCollection } from 'astro:content';
-import { generateSlug } from '@/utils/slug';
+import { getAllArticles, getDB } from '@/utils/d1';
 
 export async function GET(context) {
   const site = 'https://i-a-trend.com';
-  const allNews = await getCollection('news');
+  const db = getDB(context);
+  const allNews = db ? await getAllArticles(db) : [];
+
   const sorted = allNews.sort((a, b) =>
     new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime()
   );

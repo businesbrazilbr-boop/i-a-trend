@@ -4,7 +4,7 @@ import tailwind from '@astrojs/tailwind';
 
 export default defineConfig({
   site: 'https://i-a-trend.com',
-  output: 'static',
+  output: 'server',
   adapter: cloudflare({
     platformProxy: {
       enabled: true,

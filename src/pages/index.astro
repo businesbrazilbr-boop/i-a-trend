@@ -5,10 +5,12 @@ import Footer from '@/components/Footer.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
 import AdSense from '@/components/AdSense.astro';
-import { getCollection } from 'astro:content';
+import { getAllArticles, getDB } from '@/utils/d1';
 import { getTimeAgo } from '@/utils/date';
 
-const allNews = await getCollection('news');
+const db = getDB(Astro);
+const allNews = db ? await getAllArticles(db) : [];
+
 const sortedNews = allNews.sort((a, b) =>
   new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime()
 );
@@ -41,25 +43,20 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
 
 <Layout
   title="i-a-trend - Automação com IA para Negócios no Brasil"
-  description="As 10 melhores notícias diárias sobre automação com inteligência artificial para negócios. Curadoria feita para o ecossistema brasileiro."
+  description="As 10 melhores notícias diárias sobre automação com inteligência artificial para negócios."
   url="/"
 >
   <Header slot="header" />
 
-  <!-- Hero + Último Momento -->
   <section class="container py-6">
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Hero principal: 3 colunas à esquerda -->
       <div class="lg:col-span-3">
-        {featured && <NewsCard article={featured} variant="hero" />}
-
-        <!-- Grid de destaques secundários -->
+        {featured && <NewsCard article={featured as any} variant="hero" />}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-          {sortedNews.slice(1, 3).map(a => <NewsCard article={a} variant="featured" />)}
+          {sortedNews.slice(1, 3).map(a => <NewsCard article={a as any} variant="featured" />)}
         </div>
       </div>
 
-      <!-- Último Momento (sidebar) -->
       <div class="lg:col-span-1">
         <div class="rounded-xl border border-gray-200 bg-white sticky top-20">
           <div class="px-4 py-3 border-b border-gray-100">
@@ -100,7 +97,6 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
 
   <AdSense />
 
-  <!-- Seções por categoria -->
   {categories.map(cat => {
     const catArticles = getByCategory(cat.slug);
     if (catArticles.length === 0) return null;
@@ -108,26 +104,22 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
       <section class="container py-8">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-lg font-bold text-gray-900">{cat.label}</h2>
-          <a
-            href={`/categoria/${cat.slug}`}
-            class="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
-          >
+          <a href={`/categoria/${cat.slug}`} class="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors">
             Ver todas →
           </a>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {catArticles.map(a => <NewsCard article={a} />)}
+          {catArticles.map(a => <NewsCard article={a as any} />)}
         </div>
       </section>
     );
   })}
 
-  <!-- Resto das notícias (se sobrarem) -->
   {overflow.length > 0 && (
     <section class="container py-8">
       <h2 class="text-lg font-bold text-gray-900 mb-5">Mais Notícias</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {overflow.map(a => <NewsCard article={a} variant="compact" />)}
+        {overflow.map(a => <NewsCard article={a as any} variant="compact" />)}
       </div>
     </section>
   )}
@@ -137,6 +129,5 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
   </section>
 
   <AdSense />
-
   <Footer slot="footer" />
 </Layout>

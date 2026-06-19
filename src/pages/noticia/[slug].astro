@@ -4,44 +4,37 @@ import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import AdSense from '@/components/AdSense.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
-import { getCollection, getEntry } from 'astro:content';
+import { getArticleBySlug, getRelatedArticles, getDB } from '@/utils/d1';
 import { formatDateBR } from '@/utils/date';
 
-export async function getStaticPaths() {
-  const allNews = await getCollection('news');
-  return allNews.map(article => ({
-    params: { slug: article.data.slug },
-  }));
-}
-
+const db = getDB(Astro);
 const { slug } = Astro.params;
-const entry = await getEntry('news', slug!);
 
-let Content: any = null;
-let hasBody = false;
-let wordCount = 0;
-let readingTime = 1;
-
-if (entry) {
-  try {
-    const rendered = await entry.render();
-    Content = rendered.Content;
-    hasBody = entry.body && entry.body.trim().length > 20;
-    wordCount = entry.body ? entry.body.split(/\s+/).length : 0;
-    readingTime = Math.max(1, Math.ceil(wordCount / 200));
-  } catch (e) {
-    // render fallback
-  }
+let article = null;
+if (db && slug) {
+  article = await getArticleBySlug(db, slug);
 }
 
-const data = entry?.data;
+let related: any[] = [];
+if (article && db) {
+  related = await getRelatedArticles(db, article.data.category, article.data.slug);
+}
 
-const allNews = await getCollection('news');
-const related = data
-  ? allNews
-      .filter(a => a.data.slug !== data.slug && a.data.category === data.category)
-      .slice(0, 3)
-  : [];
+const data = article?.data || null;
+
+const hasBody = data && (data.contentFull || data.body) && (data.contentFull || data.body).length > 20;
+
+const wordCount = hasBody ? (data.contentFull || data.body).split(/\s+/).length : 0;
+const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+function formatContent(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+    .map(p => `<p class="mb-5 leading-relaxed text-[15px] text-gray-800">${p.replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
 
 const categoryLabels: Record<string, { label: string; emoji: string }> = {
   'ia-automacao': { label: 'IA & Automação', emoji: '🤖' },
@@ -68,7 +61,6 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
 
   {data ? (
     <article class="container py-8 max-w-4xl">
-      <!-- Cabeçalho -->
       <header class="mb-6">
         <div class="flex flex-wrap items-center gap-3 text-sm mb-4">
           <a
@@ -110,7 +102,6 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
         )}
       </header>
 
-      <!-- Imagem principal -->
       {data.imageUrl && (
         <figure class="mb-8 -mx-4 sm:mx-0">
           <img
@@ -124,12 +115,9 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
 
       <AdSense />
 
-      <!-- Conteúdo -->
-      <div class="prose-custom max-w-none mt-8">
-        {Content && hasBody ? (
-          <div class="article-body text-gray-800 leading-relaxed space-y-4 text-[15px]">
-            <Content />
-          </div>
+      <div class="mt-8">
+        {hasBody ? (
+          <div class="article-body" set:html={formatContent(data.contentFull || data.body)} />
         ) : (
           <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <p class="text-gray-600 leading-relaxed mb-4">{data.excerpt}</p>
@@ -147,21 +135,19 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
           </div>
         )}
 
-        {hasBody && (
-          <div class="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p class="text-sm text-gray-500">
-              Fonte original:
-              <a
-                href={data.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
-              >
-                {data.sourceName} →
-              </a>
-            </p>
-          </div>
-        )}
+        <div class="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <p class="text-sm text-gray-500">
+            Fonte original:
+            <a
+              href={data.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow sponsored"
+              class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
+            >
+              {data.sourceName} →
+            </a>
+          </p>
+        </div>
       </div>
 
       <AdSense />
@@ -198,8 +184,10 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
       </section>
     </article>
   ) : (
-    <div class="container py-16 text-center text-gray-400">
-      <p class="text-lg">Artigo não encontrado.</p>
+    <div class="container py-16 text-center">
+      <h1 class="text-2xl font-bold text-gray-400 mb-2">Artigo não encontrado</h1>
+      <p class="text-gray-500">O artigo que você procura não existe ou foi removido.</p>
+      <a href="/" class="mt-4 inline-block text-primary-600 hover:text-primary-700 font-medium">← Voltar para home</a>
     </div>
   )}
 
