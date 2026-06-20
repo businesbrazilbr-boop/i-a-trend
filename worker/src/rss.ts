@@ -26,12 +26,33 @@ function extractAllTags(text: string, tag: string): string[] {
   const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'ig');
   const results: string[] = [];
   let m;
-  while ((m = re.exec(text)) !== null) results.push(m[1].trim());
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[1].trim();
+    const cleaned = raw
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/\]\]>/g, '')
+      .trim();
+    if (cleaned) results.push(cleaned);
+  }
   return results;
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/\]\]>/g, '')
+    .trim();
+}
+
+function cleanExcerpt(text: string): string {
+  return text
+    .replace(/The post[\s\S]*?appeared first on[\s\S]*?\./gi, '')
+    .replace(/The article[\s\S]*?appeared first on[\s\S]*?\./gi, '')
+    .replace(/Originally published at[\s\S]*?\./gi, '')
+    .replace(/\[\s*Fonte[\s\S]*$/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function extractImageFromItem(itemXml: string): string | null {
@@ -113,8 +134,8 @@ export async function fetchAndParseFeed(url: string, sourceName: string, feedCat
 
       const slug = slugify(title, { lower: true, strict: true, locale: 'pt' }).slice(0, 140);
       const description = stripHtml(extractTag(itemXml, 'description') || extractTag(itemXml, 'content:encoded') || '');
-      const excerpt = description.replace(/\s+/g, ' ').trim().slice(0, 250);
-      const content = description.slice(0, 2000);
+      const excerpt = cleanExcerpt(description).slice(0, 300);
+      const content = cleanExcerpt(description).slice(0, 3000);
 
       const category = classifyCategory(title, description, feedCategory);
       const imageUrl = extractImageFromItem(itemXml);

@@ -6,17 +6,33 @@ import {
 } from './d1';
 
 async function fetchFullContent(url: string): Promise<string | null> {
-  try {
-    const resp = await fetch(`https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`, {
-      headers: { 'User-Agent': 'i-a-trend/1.0' },
-      timeout: 15000,
-    });
-    if (!resp.ok) return null;
-    const text = await resp.text();
-    return text.slice(0, 8000);
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(`https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`, {
+        headers: { 'User-Agent': 'i-a-trend/1.0' },
+        signal: AbortSignal.timeout(25000),
+      });
+      if (!resp.ok) {
+        if (attempt === 0) { await new Promise(r => setTimeout(r, 2000)); continue; }
+        return null;
+      }
+      const raw = await resp.text();
+      const cleaned = raw
+        .replace(/^Title:.*$/m, '')
+        .replace(/^URL Source:.*$/m, '')
+        .replace(/^Published Time:.*$/m, '')
+        .replace(/^Markdown Content:\s*/m, '')
+        .replace(/^---\s*$/m, '')
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+        .replace(/\]\]>/g, '')
+        .trim();
+      return cleaned.slice(0, 12000);
+    } catch {
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 2000)); continue; }
+      return null;
+    }
   }
+  return null;
 }
 import {
   getDailyCount,

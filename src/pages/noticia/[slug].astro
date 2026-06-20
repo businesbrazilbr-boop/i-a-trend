@@ -22,18 +22,30 @@ if (article && db) {
 
 const data = article?.data || null;
 
-const hasBody = data && (data.contentFull || data.body) && (data.contentFull || data.body).length > 20;
+const hasBody = data && (data.contentFull || data.body) && (data.contentFull || data.body).length > 50;
 
 const wordCount = hasBody ? (data.contentFull || data.body).split(/\s+/).length : 0;
 const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
 function formatContent(text: string): string {
-  return text
+  const paragraphs = text
     .split(/\n\n+/)
     .map(p => p.trim())
-    .filter(p => p.length > 0)
-    .map(p => `<p class="mb-5 leading-relaxed text-[15px] text-gray-800">${p.replace(/\n/g, '<br>')}</p>`)
-    .join('\n');
+    .filter(p => p.length > 10);
+
+  return paragraphs.map((p, i) => {
+    const isHead = /^#+\s/.test(p);
+    if (isHead) {
+      const level = (p.match(/^#+/) || [''])[0].length;
+      const clean = p.replace(/^#+\s*/, '');
+      if (level <= 2) return `<h2 class="article-h2">${clean}</h2>`;
+      return `<h3 class="article-h3">${clean}</h3>`;
+    }
+    if (i === 0) {
+      return `<p class="article-p article-dropcap">${p.replace(/\n/g, '<br>')}</p>`;
+    }
+    return `<p class="article-p">${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('\n');
 }
 
 const categoryLabels: Record<string, { label: string; emoji: string }> = {
@@ -60,46 +72,46 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
   <Header slot="header" />
 
   {data ? (
-    <article class="container py-8 max-w-4xl">
-      <header class="mb-6">
-        <div class="flex flex-wrap items-center gap-3 text-sm mb-4">
+    <article class="container py-8 sm:py-12 max-w-3xl">
+      <header class="mb-8">
+        <div class="flex flex-wrap items-center gap-2 text-sm mb-5">
           <a
             href={`/categoria/${data.category}`}
-            class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors"
+            class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-600 text-white hover:bg-primary-700 transition-colors"
           >
             {catInfo.emoji} {catInfo.label}
           </a>
-          <span class="text-gray-300">|</span>
-          <time datetime={data.publishedAt} class="text-gray-500">
+          <span class="text-gray-300">·</span>
+          <time datetime={data.publishedAt} class="text-gray-500 text-xs font-medium">
             {formatDateBR(data.publishedAt, { short: true })}
           </time>
-          <span class="text-gray-300">|</span>
-          <span class="text-gray-400">{data.sourceName}</span>
           {hasBody && (
             <>
-              <span class="text-gray-300">|</span>
-              <span class="text-gray-400">{readingTime} min de leitura</span>
+              <span class="text-gray-300">·</span>
+              <span class="text-gray-500 text-xs font-medium">{readingTime} min de leitura</span>
             </>
           )}
         </div>
 
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-4 text-balance">
+        <h1 class="text-3xl sm:text-4xl lg:text-[2.5rem] font-extrabold text-gray-900 leading-[1.15] mb-5 text-balance tracking-tight">
           {data.title}
         </h1>
 
-        <p class="text-lg sm:text-xl text-gray-600 leading-relaxed">
+        <p class="text-lg sm:text-xl text-gray-500 leading-relaxed font-normal max-w-2xl">
           {data.excerpt}
         </p>
 
         {data.tags.length > 0 && (
-          <div class="flex flex-wrap gap-2 mt-4">
+          <div class="flex flex-wrap gap-1.5 mt-5">
             {data.tags.map(tag => (
-              <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                #{tag}
+              <span class="px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded bg-gray-100 text-gray-500">
+                {tag}
               </span>
             ))}
           </div>
         )}
+
+        <div class="mt-6 border-b border-gray-200"></div>
       </header>
 
       {data.imageUrl && (
@@ -107,7 +119,7 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
           <img
             src={data.imageUrl}
             alt={data.title}
-            class="w-full rounded-xl sm:rounded-2xl max-h-[500px] object-cover"
+            class="w-full rounded-xl sm:rounded-2xl max-h-[480px] object-cover shadow-sm"
             loading="eager"
           />
         </figure>
@@ -115,51 +127,29 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
 
       <AdSense />
 
-      <div class="mt-8">
+      <div class="mt-6">
         {hasBody ? (
-          <div class="article-body" set:html={formatContent(data.contentFull || data.body)} />
+          <div class="prose-custom" set:html={formatContent(data.contentFull || data.body)} />
         ) : (
           <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
-            <p class="text-gray-600 leading-relaxed mb-4">{data.excerpt}</p>
-            <p class="text-gray-500">
-              Leia a matéria completa em:
-              <a
-                href={data.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
-              >
-                {data.sourceName} →
-              </a>
+            <p class="text-gray-700 leading-relaxed text-base">{data.excerpt}</p>
+            <p class="text-gray-400 text-sm mt-4">
+              Conteúdo em atualização.
             </p>
           </div>
         )}
-
-        <div class="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <p class="text-sm text-gray-500">
-            Fonte original:
-            <a
-              href={data.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer nofollow sponsored"
-              class="font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2 ml-1"
-            >
-              {data.sourceName} →
-            </a>
-          </p>
-        </div>
       </div>
 
       <AdSense />
 
       {related.length > 0 && (
-        <section class="mt-12">
-          <h2 class="text-lg font-bold text-gray-900 mb-5">Relacionados</h2>
+        <section class="mt-14 pt-8 border-t border-gray-200">
+          <h2 class="text-base font-bold text-gray-900 mb-5 uppercase tracking-wide">Leia também</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {related.map(a => (
               <a
                 href={`/noticia/${a.data.slug}`}
-                class="group p-4 rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all"
+                class="group p-4 rounded-xl border border-gray-100 hover:border-primary-200 hover:shadow-sm transition-all bg-white"
               >
                 {a.data.imageUrl && (
                   <img
@@ -169,10 +159,10 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
                     loading="lazy"
                   />
                 )}
-                <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 text-sm">
+                <h3 class="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 text-sm leading-snug">
                   {a.data.title}
                 </h3>
-                <p class="text-xs text-gray-500 mt-2 line-clamp-2">{a.data.excerpt}</p>
+                <p class="text-xs text-gray-400 mt-2 line-clamp-2">{a.data.excerpt}</p>
               </a>
             ))}
           </div>
