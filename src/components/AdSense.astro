@@ -1,13 +1,23 @@
+---
+interface Props {
+  /** ID do bloco de anúncio criado no painel do AdSense. Cada posição na página deve usar um slot diferente. */
+  adSlot: string;
+}
+
+const { adSlot } = Astro.props;
+---
+
 <div class="ad-container my-8 text-center">
   <p class="text-xs text-gray-400 mb-2">Publicidade</p>
   <ins class="adsbygoogle"
        style="display:block"
        data-ad-client="ca-pub-7116688775825972"
-       data-ad-slot="3209503292"
+       data-ad-slot={adSlot}
        data-ad-format="auto"
        data-full-width-responsive="true"></ins>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" crossorigin="anonymous"></script>
-  <script>
+  <!-- is:inline impede que o Astro agrupe este script num único módulo:
+       sem isso, o push() roda uma vez só e o segundo bloco fica sempre vazio. -->
+  <script is:inline>
     (adsbygoogle = window.adsbygoogle || []).push({});
   </script>
 </div>

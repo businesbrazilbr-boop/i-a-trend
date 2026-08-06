@@ -95,7 +95,7 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
     </div>
   </section>
 
-  <AdSense />
+  <AdSense adSlot="3209503292" />
 
   {categories.map(cat => {
     const catArticles = getByCategory(cat.slug);
@@ -128,6 +128,6 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
     <NewsletterForm />
   </section>
 
-  <AdSense />
+  <AdSense adSlot="3209503292" />
   <Footer slot="footer" />
 </Layout>

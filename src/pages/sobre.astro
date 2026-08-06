@@ -1,0 +1,70 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Header from '@/components/Header.astro';
+import Footer from '@/components/Footer.astro';
+---
+
+<Layout
+  title="Sobre o i-a-trend"
+  description="Quem somos, o que publicamos e como produzimos nosso conteúdo sobre inteligência artificial aplicada a negócios no Brasil."
+  url="/sobre"
+>
+  <Header slot="header" />
+
+  <section class="container py-10 max-w-3xl">
+    <h1 class="text-3xl font-bold text-gray-900">Sobre o i-a-trend</h1>
+
+    <p class="mt-4 text-gray-700 leading-relaxed">
+      O <strong>i-a-trend</strong> é um site brasileiro dedicado à inteligência artificial aplicada a
+      negócios. Publicamos análises sobre automação, IA generativa, machine learning e o impacto
+      dessas tecnologias no mercado brasileiro.
+    </p>
+
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">O que publicamos</h2>
+    <p class="mt-2 text-gray-700 leading-relaxed">
+      Nosso foco é explicar o que uma novidade em IA significa na prática para quem toma decisões:
+      o que muda em custos, em processos e em produto. Escrevemos para profissionais de tecnologia,
+      empreendedores e analistas de negócios que precisam entender o contexto por trás da notícia,
+      e não apenas o anúncio.
+    </p>
+
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">Categorias</h2>
+    <ul class="mt-2 list-disc list-inside text-gray-700 space-y-1">
+      <li><strong>IA &amp; Automação</strong> — Inteligência artificial, machine learning, automação de processos</li>
+      <li><strong>Negócios &amp; Tech</strong> — Fintechs, bancos digitais, blockchain, inovação corporativa</li>
+      <li><strong>Startups</strong> — Novos negócios, venture capital, scale-ups</li>
+      <li><strong>Marketing &amp; Tech</strong> — Marketing digital, CRM, vendas, anúncios</li>
+      <li><strong>Tech Geral</strong> — Tecnologia, inovação, transformação digital</li>
+    </ul>
+
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">Como produzimos nosso conteúdo</h2>
+    <p class="mt-2 text-gray-700 leading-relaxed">
+      Utilizamos ferramentas de inteligência artificial como apoio na pesquisa e na redação. Quando um
+      texto se apoia em informação apurada por outro veículo, citamos a fonte de forma visível e
+      publicamos um link para a reportagem original — o crédito é de quem apurou.
+    </p>
+    <p class="mt-2 text-gray-700 leading-relaxed">
+      Se você identificar algum conteúdo publicado aqui de forma indevida ou sem o crédito
+      correto, escreva para
+      <a href="mailto:contato@i-a-trend.com" class="text-primary-600 hover:underline">contato@i-a-trend.com</a>
+      e corrigiremos ou removeremos o material.
+    </p>
+
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">Publicidade</h2>
+    <p class="mt-2 text-gray-700 leading-relaxed">
+      Este site é mantido com receita de publicidade. Os anúncios são identificados como tal e não
+      influenciam o conteúdo editorial. Detalhes sobre cookies e publicidade estão na nossa
+      <a href="/privacidade" class="text-primary-600 hover:underline">Política de Privacidade</a>.
+    </p>
+
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">Contato</h2>
+    <p class="mt-2 text-gray-700 leading-relaxed">
+      Quer saber mais? Entre em contato pela nossa
+      <a href="/contato" class="text-primary-600 hover:underline">página de contato</a>
+      ou escreva para
+      <a href="mailto:contato@i-a-trend.com" class="text-primary-600 hover:underline">contato@i-a-trend.com</a>.
+    </p>
+  </section>
+
+  <Footer slot="footer" />
+</Layout>

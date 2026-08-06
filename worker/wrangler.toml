@@ -23,5 +23,15 @@ database_id = "2b5f1f94-cc05-4f29-890c-6785071caf84"
 [ai]
 binding = "AI"
 
+# Ingestão automática DESATIVADA.
+#
+# O cron rodava a cada 30 min (48x/dia) e o limite DAILY_LIMIT nunca chegou a ser
+# aplicado no laço de ingestão (worker/src/index.ts:130-171), então o site publicava
+# dezenas de matérias por dia copiadas na íntegra de outros veículos, sem crédito.
+# Isso viola as políticas do Google AdSense (conteúdo copiado / "scaled content abuse")
+# e expõe o site a problemas de direito autoral.
+#
+# Não reativar sem antes: (1) aplicar o DAILY_LIMIT, (2) publicar apenas resumo
+# próprio com link e crédito visível à fonte, (3) parar de usar fetchFullContent().
 [triggers]
-crons = ["*/30 * * * *"]
+crons = []
