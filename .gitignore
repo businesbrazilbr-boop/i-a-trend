@@ -10,3 +10,4 @@ worker/dist/
 # temporales de depuracion
 tail.log
 login.log
+run.log

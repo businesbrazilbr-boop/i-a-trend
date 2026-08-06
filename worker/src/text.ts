@@ -47,15 +47,26 @@ export function significantWords(title: string): Set<string> {
   return new Set(words);
 }
 
-/** Jaccard entre os conjuntos de palavras significativas. 0 = nada em comum, 1 = iguais. */
-export function titleSimilarity(a: string, b: string): number {
-  const sa = significantWords(a);
-  const sb = significantWords(b);
+/**
+ * Jaccard entre dois conjuntos ja' calculados.
+ *
+ * O agrupamento e' O(n^2) em comparacoes, entao normalizar a string dentro do
+ * laco (como fazia titleSimilarity) estourava a CPU do Worker. Calcule o
+ * conjunto uma vez por item com significantWords e compare com esta funcao.
+ */
+export function setSimilarity(sa: Set<string>, sb: Set<string>): number {
   if (sa.size === 0 || sb.size === 0) return 0;
 
+  // Itera sempre o menor conjunto.
+  const [menor, maior] = sa.size <= sb.size ? [sa, sb] : [sb, sa];
   let intersection = 0;
-  for (const w of sa) if (sb.has(w)) intersection++;
+  for (const w of menor) if (maior.has(w)) intersection++;
 
   const union = sa.size + sb.size - intersection;
   return union === 0 ? 0 : intersection / union;
+}
+
+/** Conveniencia para comparacoes avulsas. Nao usar dentro de lacos. */
+export function titleSimilarity(a: string, b: string): number {
+  return setSimilarity(significantWords(a), significantWords(b));
 }

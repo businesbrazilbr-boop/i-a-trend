@@ -12,6 +12,12 @@
 
 export const WRITER_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
+/** ~370 palavras. Abaixo disso o texto nao sustenta analise propria. */
+const MIN_BODY_CHARS = 2200;
+
+/** Uma manchete real tem sujeito e verbo; menos que isto costuma ser rotulo generico. */
+const MIN_TITLE_WORDS = 5;
+
 export interface SourceRef {
   name: string;
   url: string;
@@ -31,31 +37,41 @@ export interface WrittenArticle {
   sources: SourceRef[];
 }
 
-const SYSTEM_PROMPT = `Voce e' editor do i-a-trend, um site brasileiro sobre inteligencia artificial aplicada a negocios.
+const SYSTEM_PROMPT = `Você é editor do i-a-trend, um site brasileiro sobre inteligência artificial aplicada a negócios.
 
-Voce recebe manchetes e resumos publicos de varios veiculos sobre um mesmo assunto. Sua tarefa e' escrever uma ANALISE PROPRIA, nao um resumo e nao uma reescrita.
+Você recebe manchetes e resumos públicos de vários veículos sobre um mesmo assunto. Sua tarefa é escrever uma ANÁLISE PRÓPRIA — não um resumo, não uma reescrita.
 
 REGRAS ABSOLUTAS:
-- NUNCA parafraseie um unico veiculo. Se so' ha' uma fonte, escreva sobre o CONTEXTO do fato, nao sobre o texto dela.
-- NUNCA invente numeros, datas, valores, nomes ou declaracoes. Use apenas o que esta' nos resumos. Se um dado nao esta' la', nao o mencione.
-- NUNCA copie frases dos resumos. Formule tudo com suas proprias palavras.
-- O valor do texto esta' no ANGULO: o que isso muda para uma empresa brasileira em custo, processo, prazo ou risco. Essa analise e' sua, nao das fontes.
+- NUNCA parafraseie um único veículo. Se só há uma fonte, escreva sobre o CONTEXTO do fato, não sobre o texto dela.
+- NUNCA invente números, datas, valores, nomes ou declarações. Use apenas o que está nos resumos. Se um dado não está lá, não o mencione.
+- NUNCA copie frases dos resumos. Formule tudo com suas próprias palavras.
+- O valor do texto está no ÂNGULO: o que isso muda para uma empresa brasileira em custo, processo, prazo ou risco. Essa análise é sua, não das fontes.
+
+ORTOGRAFIA (obrigatório):
+- Escreva em português brasileiro correto, COM TODOS OS ACENTOS E CEDILHAS.
+- "automação" e não "automacao"; "inteligência" e não "inteligencia"; "análise", "negócios", "início", "serviço".
+- Texto sem acentuação será rejeitado.
+
+TÍTULO (o mais importante):
+- Deve dizer O QUE ACONTECEU, com sujeito e verbo. Específico e concreto.
+- BOM: "Embraer conclui primeiro voo horizontal do eVTOL"
+- RUIM: "IA na Automação", "Nova Fronteira na Automação", "IA avança" — genéricos demais, serão rejeitados.
+- Máximo 90 caracteres. Não copie nenhuma das manchetes recebidas.
 
 FORMATO:
-- Portugues brasileiro, tom profissional e direto.
-- Entre 500 e 800 palavras.
-- Paragrafos curtos, de 2 a 4 frases.
-- Comece pelo que mudou, nao por "nos ultimos anos...".
-- Sem markdown, sem titulos internos. Separe paragrafos com uma linha em branco.
-- Nao escreva "segundo o site X" em todo paragrafo; a atribuicao aparece numa secao de fontes.
+- Tom profissional e direto.
+- Entre 500 e 800 palavras. Textos curtos serão rejeitados.
+- Parágrafos curtos, de 2 a 4 frases.
+- Comece pelo que mudou, não por "nos últimos anos...".
+- Sem markdown, sem títulos internos. Separe parágrafos com uma linha em branco.
+- Não escreva "segundo o site X" em todo parágrafo; a atribuição aparece numa seção de fontes.
 
-Responda SOMENTE com JSON valido, sem cercas de codigo, neste formato:
+Responda SOMENTE com JSON válido, sem cercas de código, neste formato:
 {"title": "...", "excerpt": "...", "body": "...", "tags": ["...", "..."]}
 
-title: manchete propria, no maximo 90 caracteres, sem copiar nenhuma das manchetes recebidas.
-excerpt: uma frase de ate 200 caracteres.
-body: o texto completo, com \\n\\n entre paragrafos.
-tags: 3 a 5 palavras-chave em minusculas.`;
+excerpt: uma frase de até 200 caracteres.
+body: o texto completo, com \\n\\n entre parágrafos.
+tags: 3 a 5 palavras-chave em minúsculas.`;
 
 function buildUserPrompt(topic: TopicInput): string {
   const fontes = topic.items
@@ -69,6 +85,28 @@ Fontes sobre o mesmo assunto:
 ${fontes}
 
 Escreva a analise do i-a-trend sobre este assunto, seguindo as regras.`;
+}
+
+/**
+ * Normaliza a saida do Workers AI, que varia conforme o modelo e a versao:
+ *  - { response: "<texto>" }              formato antigo
+ *  - { response: { ... } }                ja' desserializado quando a saida e' JSON
+ *  - { choices: [{ message: { content }}]} formato compativel com OpenAI
+ *
+ * Tratar tudo como string quebrava com "raw.trim is not a function" e o artigo
+ * era descartado silenciosamente.
+ */
+function extractPayload(result: any): any | null {
+  if (!result) return null;
+
+  if (result.response && typeof result.response === 'object') return result.response;
+  if (typeof result.response === 'string') return parseJsonLoose(result.response);
+
+  const content = result?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return parseJsonLoose(content);
+  if (content && typeof content === 'object') return content;
+
+  return null;
 }
 
 /** Extrai o primeiro objeto JSON da resposta, tolerando cercas de codigo e texto em volta. */
@@ -104,20 +142,30 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
       ],
       max_tokens: 2000,
       temperature: 0.6,
-    }) as { response?: string };
+    });
 
-    const parsed = parseJsonLoose(result.response || '');
+    const parsed = extractPayload(result);
     if (!parsed) {
-      console.error('[writer] Resposta nao e\' JSON valido, descartando tema.');
+      console.error('[writer] Nao consegui extrair JSON da resposta, descartando tema.');
       return null;
     }
 
     const title = String(parsed.title || '').trim();
     const body = String(parsed.body || '').trim();
 
-    // Descarta saidas degeneradas em vez de publicar lixo.
-    if (title.length < 15 || body.length < 600) {
-      console.error(`[writer] Saida curta demais (titulo ${title.length}, corpo ${body.length}), descartando.`);
+    // ~2200 caracteres sao aproximadamente 370 palavras. Abaixo disso o texto
+    // vira nota curta sem analise, que e' exatamente o "conteudo de baixo valor"
+    // que o AdSense recusa.
+    if (body.length < MIN_BODY_CHARS) {
+      console.error(`[writer] Corpo curto demais (${body.length} < ${MIN_BODY_CHARS}), descartando.`);
+      return null;
+    }
+
+    // Titulo generico ("IA na Automacao") nao informa nada e prejudica busca e
+    // avaliacao editorial. Uma manchete real tem sujeito e verbo.
+    const palavrasTitulo = title.split(/\s+/).filter(w => w.length > 1).length;
+    if (palavrasTitulo < MIN_TITLE_WORDS) {
+      console.error(`[writer] Titulo generico demais ("${title}"), descartando.`);
       return null;
     }
 
