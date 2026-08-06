@@ -271,7 +271,9 @@ async function runPipeline(env: Env): Promise<{ added: number; message: string }
 
     let imageKey: string | null = null;
     try {
-      imageKey = await generateAndStoreImage(env.AI, env.IAS_IMAGES, id, escrito.tags, topic.category);
+      imageKey = await generateAndStoreImage(
+        env.AI, env.IAS_IMAGES, id, escrito.imagePrompt, escrito.tags, topic.category,
+      );
     } catch (e) {
       console.error('[i-a-trend] Erro na ilustracao, publicando sem capa:', e);
     }

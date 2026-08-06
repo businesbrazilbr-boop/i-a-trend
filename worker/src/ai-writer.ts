@@ -35,6 +35,11 @@ export interface WrittenArticle {
   body: string;
   tags: string[];
   sources: SourceRef[];
+  /**
+   * Descricao visual concreta do assunto, em ingles, para gerar a capa.
+   * Vazia quando o modelo omite o campo — image.ts cai de volta nas tags.
+   */
+  imagePrompt: string;
 }
 
 const SYSTEM_PROMPT = `Você é editor do i-a-trend, um site brasileiro sobre inteligência artificial aplicada a negócios.
@@ -67,11 +72,18 @@ FORMATO:
 - Não escreva "segundo o site X" em todo parágrafo; a atribuição aparece numa seção de fontes.
 
 Responda SOMENTE com JSON válido, sem cercas de código, neste formato:
-{"title": "...", "excerpt": "...", "body": "...", "tags": ["...", "..."]}
+{"title": "...", "excerpt": "...", "body": "...", "tags": ["...", "..."], "imagePrompt": "..."}
 
 excerpt: uma frase de até 200 caracteres.
 body: o texto completo, com \\n\\n entre parágrafos.
-tags: 3 a 5 palavras-chave em minúsculas.`;
+tags: 3 a 5 palavras-chave em minúsculas.
+imagePrompt: frase curta EM INGLÊS descrevendo objetos e cenário concretos do assunto tratado,
+para gerar a ilustração de capa. Regras:
+  - Seja específico do tema. BOM: "hospital data dashboard, medical records, chat bubbles".
+    RUIM: "artificial intelligence, technology" — genérico demais.
+  - Descreva apenas objetos, ambientes e conceitos. NUNCA texto, letras, logotipos, marcas
+    registradas ou rostos de pessoas.
+  - NUNCA descreva a cena como fotografia de um acontecimento real. É uma ilustração conceitual.`;
 
 function buildUserPrompt(topic: TopicInput): string {
   const fontes = topic.items
@@ -140,7 +152,10 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(topic) },
       ],
-      max_tokens: 2000,
+      // Folga generosa de proposito: o corpo sozinho passa de 600 tokens e, se a
+      // resposta for cortada no meio, o JSON fica invalido e o tema inteiro e'
+      // descartado — falha silenciosa e cara.
+      max_tokens: 3500,
       temperature: 0.6,
     });
 
@@ -188,6 +203,7 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
       body,
       tags,
       sources,
+      imagePrompt: String(parsed.imagePrompt || '').trim().slice(0, 300),
     };
   } catch (error) {
     console.error('[writer] Erro ao gerar artigo:', error);

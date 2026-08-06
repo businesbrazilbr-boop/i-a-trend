@@ -5,6 +5,7 @@ import Footer from '@/components/Footer.astro';
 import NewsCard from '@/components/NewsCard.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
 import AdSense from '@/components/AdSense.astro';
+import { AD_SLOT_TOPO, AD_SLOT_RODAPE } from '@/consts';
 import { getAllArticles, getDB } from '@/utils/d1';
 import { getTimeAgo } from '@/utils/date';
 
@@ -95,7 +96,7 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
     </div>
   </section>
 
-  <AdSense adSlot="3209503292" />
+  <AdSense adSlot={AD_SLOT_TOPO} />
 
   {categories.map(cat => {
     const catArticles = getByCategory(cat.slug);
@@ -128,6 +129,6 @@ const overflow = sortedNews.filter(a => !assigned.has(a.id)).slice(0, 6);
     <NewsletterForm />
   </section>
 
-  <AdSense adSlot="3209503292" />
+  <AdSense adSlot={AD_SLOT_RODAPE} />
   <Footer slot="footer" />
 </Layout>

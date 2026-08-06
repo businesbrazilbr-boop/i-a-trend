@@ -16,10 +16,21 @@ const STYLE = 'editorial conceptual illustration, flat vector style, geometric s
   + 'limited palette of deep blue and warm orange on light background, clean negative space, '
   + 'abstract, no text, no letters, no logos, no faces, no real people';
 
-/** Constroi um prompt visual a partir das palavras-chave, nunca do fato noticioso em si. */
-function buildPrompt(tags: string[], category: string): string {
-  const tema = tags.length > 0 ? tags.slice(0, 3).join(', ') : category.replace(/-/g, ' ');
-  return `Abstract editorial illustration representing the concept of ${tema}. ${STYLE}`;
+/**
+ * Monta o prompt visual.
+ *
+ * Usa a descricao concreta que o redator devolve (imagePrompt), porque ele e' o
+ * unico que conhece o assunto. As tags sozinhas produziam sempre a mesma
+ * abstracao: eram genericas ("ia", "automacao") em todo artigo.
+ *
+ * STYLE entra sempre no fim e nao e' negociavel: e' o que garante que a capa
+ * continue sendo ilustracao conceitual e nao pareca o registro fotografico de
+ * um fato real.
+ */
+function buildPrompt(imagePrompt: string, tags: string[], category: string): string {
+  const tema = imagePrompt.trim()
+    || (tags.length > 0 ? tags.slice(0, 3).join(', ') : category.replace(/-/g, ' '));
+  return `Abstract editorial illustration representing: ${tema}. ${STYLE}`;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -40,11 +51,12 @@ export async function generateAndStoreImage(
   ai: any,
   bucket: R2Bucket,
   articleId: string,
+  imagePrompt: string,
   tags: string[],
   category: string,
 ): Promise<string | null> {
   try {
-    const prompt = buildPrompt(tags, category);
+    const prompt = buildPrompt(imagePrompt, tags, category);
     console.log(`[image] Gerando ilustracao para ${articleId}...`);
 
     const result = await ai.run(IMAGE_MODEL, { prompt, steps: 4 }) as { image?: string };

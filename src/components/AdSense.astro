@@ -1,20 +1,36 @@
 ---
 interface Props {
-  /** ID do bloco de anúncio criado no painel do AdSense. Cada posição na página deve usar um slot diferente. */
+  /** ID do bloco criado no painel do AdSense. Ver src/consts.ts. */
   adSlot: string;
+  /**
+   * 'auto'       — bloco responsivo comum (topo, rodapé).
+   * 'in-article' — formato fluido para intercalar entre parágrafos. Exige uma
+   *                unidade criada como "In-article" no painel.
+   */
+  layout?: 'auto' | 'in-article';
 }
 
-const { adSlot } = Astro.props;
+const { adSlot, layout = 'auto' } = Astro.props;
+const isInArticle = layout === 'in-article';
 ---
 
-<div class="ad-container my-8 text-center">
+<div class={isInArticle ? 'ad-container my-10 text-center' : 'ad-container my-8 text-center'}>
   <p class="text-xs text-gray-400 mb-2">Publicidade</p>
-  <ins class="adsbygoogle"
-       style="display:block"
-       data-ad-client="ca-pub-7116688775825972"
-       data-ad-slot={adSlot}
-       data-ad-format="auto"
-       data-full-width-responsive="true"></ins>
+  {isInArticle ? (
+    <ins class="adsbygoogle"
+         style="display:block; text-align:center;"
+         data-ad-client="ca-pub-7116688775825972"
+         data-ad-slot={adSlot}
+         data-ad-format="fluid"
+         data-ad-layout="in-article"></ins>
+  ) : (
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-7116688775825972"
+         data-ad-slot={adSlot}
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+  )}
   <!-- is:inline impede que o Astro agrupe este script num único módulo:
        sem isso, o push() roda uma vez só e o segundo bloco fica sempre vazio. -->
   <script is:inline>

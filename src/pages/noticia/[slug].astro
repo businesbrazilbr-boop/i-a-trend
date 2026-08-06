@@ -6,6 +6,14 @@ import AdSense from '@/components/AdSense.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
 import { getArticleBySlug, getRelatedArticles, getDB, articleImageSrc } from '@/utils/d1';
 import { formatDateBR } from '@/utils/date';
+import {
+  AD_SLOT_TOPO,
+  AD_SLOT_ARTIGO,
+  AD_SLOT_RODAPE,
+  MIN_CHARS_PARA_AD_INTERCALADO,
+  MIN_PARAGRAFOS_PARA_AD,
+  AD_APOS_PARAGRAFO,
+} from '@/consts';
 
 const db = getDB(Astro);
 const { slug } = Astro.params;
@@ -38,13 +46,20 @@ const hasBody = data && (data.contentFull || data.body) && (data.contentFull || 
 const wordCount = hasBody ? (data.contentFull || data.body).split(/\s+/).length : 0;
 const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
-function formatContent(text: string): string {
-  const paragraphs = text
+function splitParagraphs(text: string): string[] {
+  return text
     .split(/\n\n+/)
     .map(p => p.trim())
     .filter(p => p.length > 10);
+}
 
-  return paragraphs.map((p, i) => {
+/**
+ * `offset` mantém o capitular no primeiro parágrafo real do artigo quando o
+ * texto é renderizado em dois blocos com o anúncio intercalado no meio.
+ */
+function renderParagraphs(paragraphs: string[], offset = 0): string {
+  return paragraphs.map((p, idx) => {
+    const i = idx + offset;
     const isHead = /^#+\s/.test(p);
     if (isHead) {
       const level = (p.match(/^#+/) || [''])[0].length;
@@ -58,6 +73,21 @@ function formatContent(text: string): string {
     return `<p class="article-p">${p.replace(/\n/g, '<br>')}</p>`;
   }).join('\n');
 }
+
+// Bloco intercalado só entra em artigo longo. Em texto curto seriam três
+// anúncios num punhado de parágrafos, que é o padrão "anúncios excedem o
+// conteúdo" reprovado na revisão do AdSense.
+const corpoTexto = hasBody ? (data?.contentFull || data?.body || '') : '';
+const paragrafos = corpoTexto ? splitParagraphs(corpoTexto) : [];
+const temAdIntercalado =
+  corpoTexto.length >= MIN_CHARS_PARA_AD_INTERCALADO &&
+  paragrafos.length >= MIN_PARAGRAFOS_PARA_AD;
+
+const corpoAntes = temAdIntercalado ? renderParagraphs(paragrafos.slice(0, AD_APOS_PARAGRAFO)) : '';
+const corpoDepois = temAdIntercalado
+  ? renderParagraphs(paragrafos.slice(AD_APOS_PARAGRAFO), AD_APOS_PARAGRAFO)
+  : '';
+const corpoInteiro = temAdIntercalado ? '' : renderParagraphs(paragrafos);
 
 const categoryLabels: Record<string, { label: string; emoji: string }> = {
   'ia-automacao': { label: 'IA & Automação', emoji: '🤖' },
@@ -139,11 +169,19 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
         </figure>
       )}
 
-      <AdSense adSlot="3209503292" />
+      <AdSense adSlot={AD_SLOT_TOPO} />
 
       <div class="mt-6">
         {hasBody ? (
-          <div class="prose-custom" set:html={formatContent(data.contentFull || data.body)} />
+          temAdIntercalado ? (
+            <>
+              <div class="prose-custom" set:html={corpoAntes} />
+              <AdSense adSlot={AD_SLOT_ARTIGO} layout="in-article" />
+              <div class="prose-custom" set:html={corpoDepois} />
+            </>
+          ) : (
+            <div class="prose-custom" set:html={corpoInteiro} />
+          )
         ) : (
           <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <p class="text-gray-700 leading-relaxed text-base">{data.excerpt}</p>
@@ -185,7 +223,7 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
         <a href="mailto:contato@i-a-trend.com" class="underline hover:text-gray-600">contato@i-a-trend.com</a>.
       </p>
 
-      <AdSense adSlot="3209503292" />
+      <AdSense adSlot={AD_SLOT_RODAPE} />
 
       {related.length > 0 && (
         <section class="mt-14 pt-8 border-t border-gray-200">
