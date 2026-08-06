@@ -1,4 +1,4 @@
-import { getAllArticles, getDB } from '@/utils/d1';
+import { getAllArticles, getDB, articleImageSrc } from '@/utils/d1';
 
 const SITE = 'https://i-a-trend.com';
 
@@ -37,15 +37,18 @@ export async function GET(context: any) {
     urlEntry(`${SITE}/`, '1.0', 'daily'),
     ...CATEGORIES.map(c => urlEntry(`${SITE}/categoria/${c}`, '0.8', 'daily')),
     ...STATIC_PAGES.map(p => urlEntry(`${SITE}${p}`, '0.5', 'monthly')),
-    ...articles.map(a =>
-      urlEntry(
+    ...articles.map(a => {
+      // Só declaramos imagens nossas. Antes o sitemap listava as URLs dos CDNs
+      // dos veículos originais, que nem sequer nos pertencem.
+      const img = articleImageSrc(a.data);
+      return urlEntry(
         `${SITE}/noticia/${a.data.slug}`,
         '0.9',
         'weekly',
         a.data.publishedAt ? new Date(a.data.publishedAt).toISOString() : undefined,
-        a.data.imageUrl || undefined
-      )
-    ),
+        img ? `${SITE}${img}` : undefined,
+      );
+    }),
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

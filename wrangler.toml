@@ -10,3 +10,9 @@ directory = "dist"
 binding = "IAS_DB"
 database_name = "ias-news"
 database_id = "2b5f1f94-cc05-4f29-890c-6785071caf84"
+
+# Ilustracoes geradas pelo worker-ias. O site as serve em /img/<key>, assim nao
+# e' preciso tornar o bucket publico nem criar um subdominio.
+[[r2_buckets]]
+binding = "IAS_IMAGES"
+bucket_name = "ias-images"

@@ -1,5 +1,6 @@
 import slugify from 'slugify';
 import { IA_KEYWORDS, CATEGORY_WEIGHTS } from './constants';
+import { decodeEntities } from './text';
 
 interface ParsedArticle {
   title: string;
@@ -128,12 +129,14 @@ export async function fetchAndParseFeed(url: string, sourceName: string, feedCat
     const articles: ParsedArticle[] = [];
 
     for (const itemXml of items) {
-      const title = stripHtml(extractTag(itemXml, 'title'));
+      // decodeEntities ANTES do slugify: sem isso, um titulo com &#8216;...&#8217;
+      // gerava slugs como "e8216carro-voadore8217-da-embraer".
+      const title = decodeEntities(stripHtml(extractTag(itemXml, 'title')));
       const link = extractTag(itemXml, 'link');
       if (!title || !link) continue;
 
       const slug = slugify(title, { lower: true, strict: true, locale: 'pt' }).slice(0, 140);
-      const description = stripHtml(extractTag(itemXml, 'description') || extractTag(itemXml, 'content:encoded') || '');
+      const description = decodeEntities(stripHtml(extractTag(itemXml, 'description') || extractTag(itemXml, 'content:encoded') || ''));
       const excerpt = cleanExcerpt(description).slice(0, 300);
       const content = cleanExcerpt(description).slice(0, 3000);
 

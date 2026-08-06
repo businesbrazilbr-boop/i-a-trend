@@ -4,7 +4,7 @@ import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import AdSense from '@/components/AdSense.astro';
 import NewsletterForm from '@/components/NewsletterForm.astro';
-import { getArticleBySlug, getRelatedArticles, getDB } from '@/utils/d1';
+import { getArticleBySlug, getRelatedArticles, getDB, articleImageSrc } from '@/utils/d1';
 import { formatDateBR } from '@/utils/date';
 
 const db = getDB(Astro);
@@ -21,6 +21,9 @@ if (article && db) {
 }
 
 const data = article?.data || null;
+
+const heroSrc = data ? articleImageSrc(data) : null;
+const sources = data?.sources ?? [];
 
 const hasBody = data && (data.contentFull || data.body) && (data.contentFull || data.body).length > 50;
 
@@ -62,7 +65,7 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
 <Layout
   title={data ? `${data.title} | i-a-trend` : 'i-a-trend'}
   description={data?.excerpt || ''}
-  image={data?.imageUrl}
+  image={heroSrc || undefined}
   url={data ? `/noticia/${data.slug}` : '/'}
   type="article"
   publishedTime={data?.publishedAt}
@@ -114,14 +117,17 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
         <div class="mt-6 border-b border-gray-200"></div>
       </header>
 
-      {data.imageUrl && (
+      {heroSrc && (
         <figure class="mb-8 -mx-4 sm:mx-0">
           <img
-            src={data.imageUrl}
-            alt={data.title}
+            src={heroSrc}
+            alt={`Ilustração para: ${data.title}`}
             class="w-full rounded-xl sm:rounded-2xl max-h-[480px] object-cover shadow-sm"
             loading="eager"
           />
+          <figcaption class="text-xs text-gray-400 mt-2 px-4 sm:px-0">
+            Ilustração conceitual gerada por IA. Não retrata o fato descrito.
+          </figcaption>
         </figure>
       )}
 
@@ -140,6 +146,37 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
         )}
       </div>
 
+      {sources.length > 0 && (
+        <section class="mt-10 p-5 rounded-xl border border-gray-200 bg-gray-50">
+          <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Fontes</h2>
+          <ul class="space-y-2">
+            {sources.map(s => (
+              <li class="text-sm">
+                <a
+                  href={s.url}
+                  rel="noopener nofollow"
+                  target="_blank"
+                  class="text-primary-600 hover:underline break-words"
+                >
+                  {s.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p class="text-xs text-gray-500 mt-4 leading-relaxed">
+            Esta análise é original do i-a-trend e foi elaborada a partir das manchetes e resumos
+            públicos das fontes acima. O crédito pela apuração dos fatos é dos veículos citados —
+            recomendamos a leitura das reportagens originais.
+          </p>
+        </section>
+      )}
+
+      <p class="mt-6 text-xs text-gray-400 leading-relaxed">
+        Texto produzido com apoio de inteligência artificial e publicado sob responsabilidade
+        editorial do i-a-trend. Encontrou um erro? Escreva para
+        <a href="mailto:contato@i-a-trend.com" class="underline hover:text-gray-600">contato@i-a-trend.com</a>.
+      </p>
+
       <AdSense adSlot="3209503292" />
 
       {related.length > 0 && (
@@ -151,9 +188,9 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
                 href={`/noticia/${a.data.slug}`}
                 class="group p-4 rounded-xl border border-gray-100 hover:border-primary-200 hover:shadow-sm transition-all bg-white"
               >
-                {a.data.imageUrl && (
+                {articleImageSrc(a.data) && (
                   <img
-                    src={a.data.imageUrl}
+                    src={articleImageSrc(a.data)}
                     alt=""
                     class="w-full aspect-video object-cover rounded-lg mb-3"
                     loading="lazy"

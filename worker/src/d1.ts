@@ -42,16 +42,20 @@ export async function insertArticle(d1: D1Database, article: {
   excerpt: string;
   content: string;
   contentFull?: string;
+  /** Fonte principal. Continua unica na tabela e e' o que evita reprocessar o mesmo item. */
   sourceUrl: string;
   sourceName: string;
+  /** Todas as fontes usadas na sintese, renderizadas no bloco "Fontes" do artigo. */
+  sources?: Array<{ name: string; url: string }>;
   category: string;
   publishedAt: string;
-  imageUrl: string | null;
+  /** Key do objeto no R2. Substitui image_url: nao servimos mais imagem de terceiro. */
+  imageKey?: string | null;
   tags: string[];
 }): Promise<void> {
   await d1.prepare(`
-    INSERT OR IGNORE INTO articles (id, title, slug, excerpt, content, content_full, source_url, source_name, category, published_at, image_url, tags, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT OR IGNORE INTO articles (id, title, slug, excerpt, content, content_full, source_url, source_name, sources, category, published_at, image_url, image_key, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, datetime('now'))
   `).bind(
     article.id,
     article.title,
@@ -61,9 +65,10 @@ export async function insertArticle(d1: D1Database, article: {
     article.contentFull || null,
     article.sourceUrl,
     article.sourceName,
+    JSON.stringify(article.sources || []),
     article.category,
     article.publishedAt,
-    article.imageUrl,
+    article.imageKey || null,
     JSON.stringify(article.tags),
   ).run();
 }
@@ -91,6 +96,8 @@ export async function initDatabase(d1: D1Database): Promise<void> {
       category TEXT NOT NULL DEFAULT 'tech-geral',
       published_at TEXT NOT NULL,
       image_url TEXT,
+      image_key TEXT,
+      sources TEXT DEFAULT '[]',
       tags TEXT DEFAULT '[]',
       created_at TEXT NOT NULL
     );
@@ -99,4 +106,17 @@ export async function initDatabase(d1: D1Database): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_articles_source_url ON articles(source_url);
     CREATE INDEX IF NOT EXISTS idx_articles_created ON articles(created_at);
   `);
+
+  // Migracao para bancos criados antes destas colunas. ALTER TABLE falha se a
+  // coluna ja' existe, e nao ha' "IF NOT EXISTS" para colunas no SQLite.
+  for (const sql of [
+    'ALTER TABLE articles ADD COLUMN image_key TEXT',
+    "ALTER TABLE articles ADD COLUMN sources TEXT DEFAULT '[]'",
+  ]) {
+    try {
+      await d1.exec(sql);
+    } catch {
+      // Coluna ja' existe.
+    }
+  }
 }

@@ -8,30 +8,35 @@ binding = "IAS_CACHE"
 id = "fb98c02d911c416db3ff592f23d81ceb"
 
 [vars]
-GITHUB_REPO = "businesbrazilbr-boop/i-a-trend"
-GITHUB_BRANCH = "main"
-DAILY_LIMIT = "10"
-CONTENT_PATH = "src/content/news"
 SITE_URL = "https://i-a-trend.com"
 ENVIRONMENT = "production"
+# DAILY_LIMIT saiu daqui de proposito. Existia como var e como constante, e o
+# laco de ingestao nao aplicava nenhuma das duas: o worker publicava tudo o que
+# encontrasse. Agora o limite e' uma unica constante em src/index.ts, aplicada
+# de verdade antes do laco.
 
 [[d1_databases]]
 binding = "IAS_DB"
 database_name = "ias-news"
 database_id = "2b5f1f94-cc05-4f29-890c-6785071caf84"
 
+# Ilustracoes proprias geradas por Workers AI. Substitui o hotlink da og:image
+# do veiculo original. Criar antes do deploy:
+#   npx wrangler r2 bucket create ias-images
+[[r2_buckets]]
+binding = "IAS_IMAGES"
+bucket_name = "ias-images"
+
 [ai]
 binding = "AI"
 
-# Ingestão automática DESATIVADA.
+# Cron deliberadamente vazio.
 #
-# O cron rodava a cada 30 min (48x/dia) e o limite DAILY_LIMIT nunca chegou a ser
-# aplicado no laço de ingestão (worker/src/index.ts:130-171), então o site publicava
-# dezenas de matérias por dia copiadas na íntegra de outros veículos, sem crédito.
-# Isso viola as políticas do Google AdSense (conteúdo copiado / "scaled content abuse")
-# e expõe o site a problemas de direito autoral.
+# O trigger antigo (*/30 * * * *, 48x/dia) foi removido no painel porque
+# alimentava a copia em massa de materias de outros veiculos.
 #
-# Não reativar sem antes: (1) aplicar o DAILY_LIMIT, (2) publicar apenas resumo
-# próprio com link e crédito visível à fonte, (3) parar de usar fetchFullContent().
+# Ativar SO' depois de rodar o pipeline novo a mao (GET /run) e revisar os 5
+# primeiros artigos gerados. Valor a usar quando for a hora:
+#   crons = ["0 9 * * *"]
 [triggers]
 crons = []

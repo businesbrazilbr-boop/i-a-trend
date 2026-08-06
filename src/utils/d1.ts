@@ -1,12 +1,21 @@
+export interface SourceRef {
+  name: string;
+  url: string;
+}
+
 export interface ArticleData {
   title: string;
   slug: string;
   excerpt: string;
   sourceUrl: string;
   sourceName: string;
+  /** Todas as fontes usadas na sintese. Renderizadas no bloco "Fontes". */
+  sources: SourceRef[];
   category: string;
   publishedAt: string;
   imageUrl: string | null;
+  /** Key da ilustracao propria no R2, servida em /img/<key>. */
+  imageKey: string | null;
   tags: string[];
   contentFull: string | null;
   body: string;
@@ -18,8 +27,23 @@ export interface ArticleEntry {
   body: string;
 }
 
+/** Campos JSON vindos do D1 podem estar malformados; nunca deixar isso derrubar a pagina. */
+function parseJsonArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value !== 'string' || value.trim() === '') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as T[] : [];
+  } catch {
+    return [];
+  }
+}
+
 function rowToArticle(row: any): ArticleEntry {
-  const tags: string[] = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags || [];
+  const tags = parseJsonArray<string>(row.tags);
+  const sources = parseJsonArray<SourceRef>(row.sources)
+    .filter(s => s && typeof s.url === 'string' && typeof s.name === 'string');
+
   return {
     id: row.id,
     body: row.content_full || row.content || '',
@@ -29,9 +53,11 @@ function rowToArticle(row: any): ArticleEntry {
       excerpt: row.excerpt || '',
       sourceUrl: row.source_url,
       sourceName: row.source_name,
+      sources,
       category: row.category,
       publishedAt: row.published_at,
       imageUrl: row.image_url || null,
+      imageKey: row.image_key || null,
       tags: tags.slice(0, 5),
       contentFull: row.content_full || null,
       body: row.content_full || row.content || '',
@@ -70,6 +96,17 @@ export async function getArticlesByCategory(db: D1Database, category: string): P
 export async function getRelatedArticles(db: D1Database, category: string, slug: string, limit = 3): Promise<ArticleEntry[]> {
   const { results } = await safeAll(db, 'SELECT * FROM articles WHERE category = ? AND slug != ? ORDER BY published_at DESC LIMIT ?', category, slug, limit);
   return (results || []).map(rowToArticle);
+}
+
+/**
+ * URL da capa do artigo.
+ *
+ * So' devolve ilustracoes proprias (R2). O campo image_url dos artigos antigos
+ * apontava para o CDN do veiculo original — uso de imagem de terceiro por
+ * hotlink — e por isso e' deliberadamente ignorado aqui.
+ */
+export function articleImageSrc(data: { imageKey?: string | null }): string | null {
+  return data.imageKey ? `/img/${data.imageKey}` : null;
 }
 
 export function getDB(context: any): D1Database | null {

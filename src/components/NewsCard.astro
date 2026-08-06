@@ -1,5 +1,6 @@
 ---
 import { formatDateBR, getTimeAgo } from '@/utils/date';
+import { articleImageSrc } from '@/utils/d1';
 import type { CollectionEntry } from 'astro:content';
 
 interface Props {
@@ -9,6 +10,9 @@ interface Props {
 
 const { article, variant = 'default' } = Astro.props;
 const { data } = article;
+
+// Só ilustrações próprias (R2). Ver articleImageSrc em @/utils/d1.
+const imgSrc = articleImageSrc(data as any);
 
 function catLabel(slug: string): string {
   const labels: Record<string, string> = {
@@ -29,9 +33,9 @@ function catLabel(slug: string): string {
       class="group grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-6 rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-primary-300 hover:shadow-lg transition-all"
     >
       <div class="aspect-[16/9] lg:aspect-auto bg-gray-100 overflow-hidden lg:min-h-[340px]">
-        {data.imageUrl ? (
+        {imgSrc ? (
           <img
-            src={data.imageUrl}
+            src={imgSrc}
             alt={data.title}
             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="eager"
@@ -63,9 +67,9 @@ function catLabel(slug: string): string {
       class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-900 via-primary-800 to-accent-900 min-h-[360px] sm:min-h-[420px] flex items-end"
     >
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10" />
-      {data.imageUrl && (
+      {imgSrc && (
         <img
-          src={data.imageUrl}
+          src={imgSrc}
           alt={data.title}
           class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           loading="lazy"
@@ -91,9 +95,9 @@ function catLabel(slug: string): string {
       href={`/noticia/${data.slug}`}
       class="group flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-gray-100 hover:border-primary-200"
     >
-      {data.imageUrl && (
+      {imgSrc && (
         <img
-          src={data.imageUrl}
+          src={imgSrc}
           alt=""
           class="w-16 h-16 rounded-lg object-cover flex-shrink-0"
           loading="lazy"
@@ -135,10 +139,10 @@ function catLabel(slug: string): string {
       href={`/noticia/${data.slug}`}
       class="group flex flex-col rounded-xl border border-gray-200 hover:border-primary-300 overflow-hidden transition-all hover:shadow-md"
     >
-      {data.imageUrl ? (
+      {imgSrc ? (
         <div class="aspect-[16/9] bg-gray-100 overflow-hidden">
           <img
-            src={data.imageUrl}
+            src={imgSrc}
             alt={data.title}
             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
