@@ -3,8 +3,13 @@ compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 main = "dist/_worker.js/index.js"
 
+# O binding e' obrigatorio, nao opcional: sem ele o adaptador do Astro chama
+# env.ASSETS.fetch() em toda rota que nao casa e estoura com
+# "TypeError: Cannot read properties of undefined (reading 'fetch')",
+# devolvendo 500 de corpo vazio em vez da pagina 404.
 [assets]
 directory = "dist"
+binding = "ASSETS"
 
 # O adaptador @astrojs/cloudflare ativa sessions por padrao e espera um binding
 # chamado SESSION; sem ele o build avisa "Invalid binding `SESSION`". O site nao

@@ -7,3 +7,6 @@ dist/
 worker/dist/
 .vite/
 .cache/
+# temporales de depuracion
+tail.log
+login.log

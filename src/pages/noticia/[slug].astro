@@ -22,6 +22,14 @@ if (article && db) {
 
 const data = article?.data || null;
 
+// Um artigo inexistente precisa devolver 404 de verdade. Sem isto o Astro serve
+// a UI de fallback com status 200 e o Google registra um soft 404, que conta
+// como pagina de baixo valor na avaliacao do site.
+if (!data) {
+  Astro.response.status = 404;
+  Astro.response.statusText = 'Not Found';
+}
+
 const heroSrc = data ? articleImageSrc(data) : null;
 const sources = data?.sources ?? [];
 
