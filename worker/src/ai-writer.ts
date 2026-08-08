@@ -10,13 +10,44 @@
  * propria. Nunca recebe o corpo de nenhum artigo, porque nunca o buscamos.
  */
 
+import { significantWords, setSimilarity } from './text';
+
 export const WRITER_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
-/** ~370 palavras. Abaixo disso o texto nao sustenta analise propria. */
-const MIN_BODY_CHARS = 2200;
+/**
+ * ~270 palavras. Abaixo disso o texto nao sustenta analise propria.
+ *
+ * Era 2200 (~370 palavras) e o prompt pedia 500 a 800 palavras avisando que
+ * "textos curtos serao rejeitados". Havia piso e nenhum teto, entao o modelo
+ * batia a meta enchendo linguica: duas conclusoes e a mesma frase repetida.
+ * Piso mais baixo + teto + checagem de repeticao tiram o incentivo a esticar.
+ */
+const MIN_BODY_CHARS = 1600;
+
+/** ~620 palavras. Daqui para cima esta' pipeline nao acrescenta fato, acrescenta repeticao. */
+const MAX_BODY_CHARS = 3800;
 
 /** Uma manchete real tem sujeito e verbo; menos que isto costuma ser rotulo generico. */
 const MIN_TITLE_WORDS = 5;
+
+/**
+ * Jaccard entre dois paragrafos. Acima disto, dizem a mesma coisa com outras palavras.
+ *
+ * Calibrado nos dois artigos publicados em 06/08: no que veio esticado, os pares
+ * repetidos deram 0.47, 0.42 e 0.41; no que nao repetia (so' especulava), o par
+ * mais parecido deu 0.17. Comecou em 0.6, que nunca disparava.
+ */
+const PARAGRAPH_REPEAT_THRESHOLD = 0.42;
+
+/** Conectores que so' cabem num paragrafo de fecho. Dois fechos = texto esticado. */
+const FECHO = /^\s*(em resumo|em conclus[ãa]o|em suma|resumindo|concluindo|por fim|em s[ií]ntese)\b/i;
+
+/**
+ * Verbos de especulacao. "pode ajudar", "pode contribuir", "pode levar a
+ * melhorias" nao informam nada; um texto feito so' disso e' conversa fiada com
+ * cara de analise.
+ */
+const ESPECULACAO = /\b(pode|podem|poderia|poderiam)\b/gi;
 
 export interface SourceRef {
   name: string;
@@ -63,13 +94,27 @@ TÍTULO (o mais importante):
 - RUIM: "IA na Automação", "Nova Fronteira na Automação", "IA avança" — genéricos demais, serão rejeitados.
 - Máximo 90 caracteres. Não copie nenhuma das manchetes recebidas.
 
+CONCRETO (obrigatório):
+- Todo dado que aparecer nos resumos — número, valor, prazo, nome de produto ou de
+  empresa — deve entrar no texto. É o que separa análise de conversa fiada.
+- Se os resumos não trazem dado nenhum, escreva sobre o mecanismo concreto: o que muda
+  no processo, em que etapa, com que custo ou que risco. Nunca sobre "o potencial da IA".
+
 FORMATO:
 - Tom profissional e direto.
-- Entre 500 e 800 palavras. Textos curtos serão rejeitados.
+- Entre 350 e 550 palavras. Um texto curto e denso vale mais que um longo e repetitivo.
 - Parágrafos curtos, de 2 a 4 frases.
 - Comece pelo que mudou, não por "nos últimos anos...".
 - Sem markdown, sem títulos internos. Separe parágrafos com uma linha em branco.
 - Não escreva "segundo o site X" em todo parágrafo; a atribuição aparece numa seção de fontes.
+
+ENCHER LINGUIÇA É MOTIVO DE REJEIÇÃO:
+- UM único parágrafo de fecho. Nunca "Em resumo" no meio e "Em conclusão" no fim.
+- Nunca repita uma ideia já dita com outras palavras. Parágrafo que não acrescenta fato
+  ou consequência nova deve ser cortado, não reescrito.
+- No máximo um "pode/poderia" por parágrafo, e sempre ancorado em algo concreto.
+- Se os resumos não dão material para 350 palavras de análise real, responda
+  exatamente {"skip": true}. Recusar o tema é melhor que inventar volume.
 
 Responda SOMENTE com JSON válido, sem cercas de código, neste formato:
 {"title": "...", "excerpt": "...", "body": "...", "tags": ["...", "..."], "imagePrompt": "..."}
@@ -165,14 +210,61 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
       return null;
     }
 
+    // Saida de recusa prevista no prompt: melhor o modelo dizer que o tema nao
+    // da' materia do que produzir 500 palavras de especulacao para preencher.
+    if (parsed.skip === true) {
+      console.warn('[writer] Modelo recusou o tema por falta de material.');
+      return null;
+    }
+
     const title = String(parsed.title || '').trim();
     const body = String(parsed.body || '').trim();
 
-    // ~2200 caracteres sao aproximadamente 370 palavras. Abaixo disso o texto
-    // vira nota curta sem analise, que e' exatamente o "conteudo de baixo valor"
-    // que o AdSense recusa.
+    // Abaixo do piso o texto vira nota curta sem analise, que e' exatamente o
+    // "conteudo de baixo valor" que o AdSense recusa.
     if (body.length < MIN_BODY_CHARS) {
       console.error(`[writer] Corpo curto demais (${body.length} < ${MIN_BODY_CHARS}), descartando.`);
+      return null;
+    }
+
+    if (body.length > MAX_BODY_CHARS) {
+      console.error(`[writer] Corpo longo demais (${body.length} > ${MAX_BODY_CHARS}), descartando.`);
+      return null;
+    }
+
+    // Paragrafos curtos demais sao separadores ou frases soltas, nao entram nas
+    // checagens de estrutura.
+    const paragrafos = body.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 40);
+
+    // Dois fechos no mesmo texto ("Em resumo" no meio, "Em conclusao" no fim) e' a
+    // assinatura do modelo esticando o texto para bater a contagem de palavras.
+    const fechos = paragrafos.filter(p => FECHO.test(p)).length;
+    if (fechos > 1) {
+      console.error(`[writer] ${fechos} paragrafos de conclusao, descartando.`);
+      return null;
+    }
+
+    // Paragrafos que repetem um ao outro. No artigo do gateway de IA a frase
+    // "controle mais preciso sobre como seus recursos de IA sao utilizados"
+    // apareceu em tres paragrafos diferentes.
+    const conjuntos = paragrafos.map(significantWords);
+    for (let i = 0; i < conjuntos.length; i++) {
+      for (let j = i + 1; j < conjuntos.length; j++) {
+        const sim = setSimilarity(conjuntos[i], conjuntos[j]);
+        if (sim >= PARAGRAPH_REPEAT_THRESHOLD) {
+          console.error(`[writer] Paragrafos ${i + 1} e ${j + 1} repetidos (${sim.toFixed(2)}), descartando.`);
+          return null;
+        }
+      }
+    }
+
+    // Mais de um verbo especulativo por paragrafo, em media, e' texto feito de
+    // "pode ajudar" e "pode contribuir" — nenhum fato, so' volume.
+    const especulacoes = (body.match(ESPECULACAO) || []).length;
+    if (paragrafos.length > 0 && especulacoes > paragrafos.length) {
+      console.error(
+        `[writer] Especulativo demais (${especulacoes} "pode" em ${paragrafos.length} paragrafos), descartando.`,
+      );
       return null;
     }
 

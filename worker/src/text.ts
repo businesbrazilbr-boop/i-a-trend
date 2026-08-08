@@ -27,6 +27,17 @@ export function stripHtml(input: string): string {
 /** Marcas diacriticas combinantes, removidas apos normalize('NFD'). */
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
+/**
+ * Remove acentos e cedilhas, preservando o resto do texto.
+ *
+ * Necessario para casar palavra inteira: \b do JavaScript trata caractere
+ * acentuado como separador, entao /\bia\b/ casaria dentro de "notícia".
+ * Normalizando antes, a fronteira de palavra volta a funcionar.
+ */
+export function stripAccents(input: string): string {
+  return input.normalize('NFD').replace(COMBINING_MARKS, '');
+}
+
 const STOPWORDS = new Set([
   'a', 'o', 'as', 'os', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos', 'das',
   'em', 'no', 'na', 'nos', 'nas', 'por', 'para', 'com', 'sem', 'sobre', 'entre',

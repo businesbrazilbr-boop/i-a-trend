@@ -67,6 +67,14 @@ interface FeedConfig {
    * 'primaria'      = fonte de origem (newsroom, orgao oficial, pesquisa).
    */
   tipo: 'descobrimento' | 'primaria';
+  /**
+   * Newsroom cujo material e' todo de IA. Dispensa o filtro de palavra-chave,
+   * porque o resumo do RSS as vezes descreve o produto sem repetir o termo.
+   *
+   * NAO marcar veiculos de pauta ampla (Agencia Brasil, G1, InfoMoney): e'
+   * justamente neles que o filtro precisa rodar.
+   */
+  iaGarantida?: boolean;
 }
 
 function getDateBR(): string {
@@ -78,11 +86,11 @@ function getDateBR(): string {
 function loadFeeds(): FeedConfig[] {
   return [
     // --- Fontes primarias: newsrooms e orgaos oficiais. Daqui sai o grosso do material. ---
-    { name: 'OpenAI', url: 'https://openai.com/news/rss.xml', category: 'ia-automacao', tipo: 'primaria' },
-    { name: 'Google DeepMind', url: 'https://deepmind.google/blog/rss.xml', category: 'ia-automacao', tipo: 'primaria' },
-    { name: 'Microsoft AI', url: 'https://blogs.microsoft.com/ai/feed/', category: 'ia-automacao', tipo: 'primaria' },
-    { name: 'AWS Machine Learning', url: 'https://aws.amazon.com/blogs/machine-learning/feed/', category: 'ia-automacao', tipo: 'primaria' },
-    { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml', category: 'ia-automacao', tipo: 'primaria' },
+    { name: 'OpenAI', url: 'https://openai.com/news/rss.xml', category: 'ia-automacao', tipo: 'primaria', iaGarantida: true },
+    { name: 'Google DeepMind', url: 'https://deepmind.google/blog/rss.xml', category: 'ia-automacao', tipo: 'primaria', iaGarantida: true },
+    { name: 'Microsoft AI', url: 'https://blogs.microsoft.com/ai/feed/', category: 'ia-automacao', tipo: 'primaria', iaGarantida: true },
+    { name: 'AWS Machine Learning', url: 'https://aws.amazon.com/blogs/machine-learning/feed/', category: 'ia-automacao', tipo: 'primaria', iaGarantida: true },
+    { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml', category: 'ia-automacao', tipo: 'primaria', iaGarantida: true },
     // Agencia Brasil e' Creative Commons BY: texto e foto reutilizaveis com credito.
     { name: 'Agência Brasil', url: 'https://agenciabrasil.ebc.com.br/rss/economia/feed.xml', category: 'negocios-tech', tipo: 'primaria' },
     { name: 'Agência Gov', url: 'https://agenciagov.ebc.com.br/rss.xml', category: 'negocios-tech', tipo: 'primaria' },
@@ -169,7 +177,7 @@ async function runPipeline(env: Env): Promise<{ added: number; message: string }
 
   for (const feed of feeds) {
     try {
-      const parsed = await fetchAndParseFeed(feed.url, feed.name, feed.category);
+      const parsed = await fetchAndParseFeed(feed.url, feed.name, feed.category, !feed.iaGarantida);
       for (const a of parsed) {
         all.push({
           title: decodeEntities(a.title),
@@ -218,14 +226,24 @@ async function runPipeline(env: Env): Promise<{ added: number; message: string }
   const topics = clusterTopics(candidatos);
   console.log(`[i-a-trend] ${novos.length} novos, ${candidatos.length} candidatos, ${topics.length} temas.`);
 
-  // Prioriza temas com cobertura de mais de uma fonte; se nao houver o bastante,
-  // completa com os melhores restantes.
   const comCobertura = topics.filter(t => t.items.length >= MIN_SOURCES_PREFERRED);
-  const restantes = topics.filter(t => t.items.length < MIN_SOURCES_PREFERRED);
+
+  // MIN_SOURCES_PREFERRED era so' uma ordenacao: os temas de fonte unica caiam
+  // em 'restantes' e enchiam a fila do mesmo jeito. Os artigos publicados no
+  // dia 06/08 tinham todos UMA fonte, exatamente o que o comentario da constante
+  // previa ("tende a produzir parafrase").
+  //
+  // Agora fonte unica so' passa quando a fonte e' primaria: ai ela e' a origem
+  // do fato (a propria OpenAI anunciando seu modelo), nao um veiculo reescrevendo
+  // terceiros. Com uma unica fonte de descobrimento nao ha' o que sintetizar.
+  const fonteUnicaDeOrigem = topics.filter(
+    t => t.items.length < MIN_SOURCES_PREFERRED && t.items[0].tipo === 'primaria',
+  );
+
   // Tenta mais temas do que a cota. O redator rejeita saidas fracas (titulo
   // generico ou texto curto) e, sem folga, um ciclo com muitas rejeicoes
   // publicaria bem menos que o previsto. Para assim que atingir DAILY_LIMIT.
-  const fila = [...comCobertura, ...restantes].slice(0, DAILY_LIMIT * 4);
+  const fila = [...comCobertura, ...fonteUnicaDeOrigem].slice(0, DAILY_LIMIT * 4);
 
   console.log(`[i-a-trend] ${fila.length} temas na fila para publicar ${DAILY_LIMIT}.`);
 

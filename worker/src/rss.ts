@@ -1,6 +1,6 @@
 import slugify from 'slugify';
 import { IA_KEYWORDS, CATEGORY_WEIGHTS } from './constants';
-import { decodeEntities } from './text';
+import { decodeEntities, stripAccents } from './text';
 
 interface ParsedArticle {
   title: string;
@@ -64,8 +64,39 @@ function extractImageFromItem(itemXml: string): string | null {
   return null;
 }
 
+/** Escapa um termo e tira o acento, para entrar numa regex de palavra inteira. */
+function paraRegex(termo: string): string {
+  return stripAccents(termo.toLowerCase()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Palavras-chave de IA com fronteira de palavra, sobre texto sem acento.
+ *
+ * IA_KEYWORDS nao tem "ia" sozinho, e em portugues e' de longe a forma mais
+ * comum de escrever o assunto ("empresas adotam IA"). Por substring nao dava
+ * para acrescentar — "ia" cabe dentro de notícia, agência, economia —, mas com
+ * fronteira de palavra e' seguro, e sem isso o filtro derrubaria materia boa
+ * dos feeds de descobrimento.
+ */
+const RELEVANCIA_IA = new RegExp(`\\b(${[...IA_KEYWORDS, 'ia'].map(paraRegex).join('|')})\\b`);
+
+function temPalavraChaveIA(texto: string): boolean {
+  return RELEVANCIA_IA.test(stripAccents(texto.toLowerCase()));
+}
+
+/**
+ * Escolhe a categoria pelo texto, caindo na do feed quando nada casa.
+ *
+ * As palavras eram comparadas como SUBSTRING, e a lista de 'ia-automacao'
+ * comecava por 'ia'. Em portugues "ia" aparece dentro de notícia, agência,
+ * tecnologia, família, experiência, economia, dia... ou seja, qualquer texto
+ * pontuava altissimo nessa categoria e o site inteiro saiu marcado como
+ * "IA & Automação", inclusive materias de apostas e de taxa de juros.
+ *
+ * Agora a comparacao e' por palavra inteira sobre o texto sem acentos.
+ */
 function classifyCategory(title: string, content: string, feedCategory: string): string {
-  const text = `${title} ${content}`.toLowerCase();
+  const text = stripAccents(`${title} ${content}`.toLowerCase());
   const categoryKeywords: Record<string, string[]> = {
     'ia-automacao': ['ia', 'inteligência artificial', 'machine learning', 'deep learning', 'ia generativa', 'chatgpt', 'gpt', 'llm', 'automação', 'rpa', 'copilot', 'neural', 'nlp', 'chatbot', 'assistente virtual', 'computer vision'],
     'negocios-tech': ['fintech', 'banco digital', 'investimento', 'cripto', 'blockchain', 'pagamento', 'pix', 'cartão', 'crédito', 'finanças', 'corporativo', 'b2b', 'erp', 'sap'],
@@ -79,8 +110,7 @@ function classifyCategory(title: string, content: string, feedCategory: string):
   for (const [cat, keywords] of Object.entries(categoryKeywords)) {
     let score = 0;
     for (const kw of keywords) {
-      const regex = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      const matches = text.match(regex);
+      const matches = text.match(new RegExp(`\\b${paraRegex(kw)}\\b`, 'g'));
       if (matches) score += matches.length;
     }
     if (score > maxScore) { maxScore = score; bestCategory = cat; }
@@ -106,7 +136,17 @@ function calculateScore(item: { title: string; excerpt: string; category: string
   return score;
 }
 
-export async function fetchAndParseFeed(url: string, sourceName: string, feedCategory: string): Promise<ParsedArticle[]> {
+/**
+ * @param exigeIA Descarta itens sem nenhuma palavra-chave de IA. Passe false
+ *   apenas para newsrooms cujo material e' todo do tema (OpenAI, DeepMind...),
+ *   onde o resumo do RSS as vezes nem repete o termo.
+ */
+export async function fetchAndParseFeed(
+  url: string,
+  sourceName: string,
+  feedCategory: string,
+  exigeIA = true,
+): Promise<ParsedArticle[]> {
   try {
     const resp = await fetch(url, {
       headers: {
@@ -148,10 +188,13 @@ export async function fetchAndParseFeed(url: string, sourceName: string, feedCat
 
       const categories = extractAllTags(itemXml, 'category').map(c => c.toLowerCase().trim()).filter(Boolean);
 
-      const aiRelevant = IA_KEYWORDS.some(kw =>
-        title.toLowerCase().includes(kw) || description.toLowerCase().includes(kw)
-      );
-      if (!aiRelevant && feedCategory === 'tech-geral') continue;
+      const aiRelevant = temPalavraChaveIA(`${title} ${description}`);
+      // O filtro so' valia para feeds 'tech-geral'. Agencia Brasil entra como
+      // 'negocios-tech', entao o feed de economia geral passava inteiro: dai
+      // sairam "Perdas com bets atingem R$ 62,5 bilhoes" e "Taxa Basica de Juros
+      // e Reavaliada", que nao sao noticia de IA. Sem material do tema, o redator
+      // inventa um angulo de IA por cima do fato — especulacao, nao analise.
+      if (exigeIA && !aiRelevant) continue;
 
       const article: ParsedArticle = {
         title, slug, excerpt,
