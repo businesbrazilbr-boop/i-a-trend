@@ -30,13 +30,14 @@ bucket_name = "ias-images"
 [ai]
 binding = "AI"
 
-# Cron deliberadamente vazio.
+# Uma execucao por dia, as 09:00 UTC = 06:00 em Brasilia. O cron do Cloudflare e'
+# sempre UTC; para mudar o horario local, desloque este valor (09:00 BRT seria
+# "0 12 * * *").
 #
-# O trigger antigo (*/30 * * * *, 48x/dia) foi removido no painel porque
-# alimentava a copia em massa de materias de outros veiculos.
+# O trigger antigo era */30 * * * * — 48 execucoes por dia — e foi removido porque
+# alimentava a copia em massa de materias de outros veiculos. 1x/dia com
+# DAILY_LIMIT = 5 e' o teto deliberado: cinco artigos diarios.
 #
-# Ativar SO' depois de rodar o pipeline novo a mao (GET /run) e revisar os 5
-# primeiros artigos gerados. Valor a usar quando for a hora:
-#   crons = ["0 9 * * *"]
+# Para desligar sem apagar nada, basta voltar a crons = [] e refazer o deploy.
 [triggers]
-crons = []
+crons = ["0 9 * * *"]
