@@ -100,7 +100,7 @@ export interface WrittenArticle {
 
 const SYSTEM_PROMPT = `Você é editor do i-a-trend, um site brasileiro sobre inteligência artificial aplicada a negócios.
 
-Você recebe manchetes e resumos públicos de vários veículos sobre um mesmo assunto. Sua tarefa é escrever uma ANÁLISE PRÓPRIA — não um resumo, não uma reescrita.
+Você recebe as manchetes de vários veículos sobre um mesmo assunto e o texto das matérias. Sua tarefa é escrever uma ANÁLISE PRÓPRIA — não um resumo, não uma reescrita.
 
 Junto com as manchetes você recebe MATERIAL DE APOIO: o texto das matérias de origem.
 Ele existe para você saber os FATOS — o que foi anunciado, por quem, com que números.
@@ -302,6 +302,24 @@ Responda só com o bloco ###CORPO### seguido do texto.`,
   }
 }
 
+/**
+ * Corta o titulo em limite de palavra.
+ *
+ * Era slice(0, 140) seco. O prompt pede no maximo 90 caracteres e o modelo passa
+ * disso com frequencia — um titulo saiu com 122. Num titulo mais longo, o corte
+ * cru partiria a ultima palavra pela metade e isso iria para a <h1>, para a aba
+ * do navegador e para o resultado de busca.
+ */
+function encurtarTitulo(title: string, max = 120): string {
+  const limpo = title.replace(/\s+/g, ' ').trim();
+  if (limpo.length <= max) return limpo;
+
+  const corte = limpo.slice(0, max);
+  const ultimoEspaco = corte.lastIndexOf(' ');
+  const base = ultimoEspaco > max * 0.6 ? corte.slice(0, ultimoEspaco) : corte;
+  return base.replace(/[\s,;:—-]+$/, '');
+}
+
 export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenArticle | null> {
   if (topic.items.length === 0) return null;
 
@@ -432,7 +450,7 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
     }
 
     return {
-      title: title.slice(0, 140),
+      title: encurtarTitulo(title),
       excerpt: parsed.excerpt.slice(0, 300),
       body,
       tags: parsed.tags,

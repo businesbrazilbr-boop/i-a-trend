@@ -98,6 +98,13 @@ const categoryLabels: Record<string, { label: string; emoji: string }> = {
 };
 
 const catInfo = data ? (categoryLabels[data.category] || { label: data.category, emoji: '📰' }) : { label: '', emoji: '📰' };
+
+// Nota sobre o bloco "Fontes", mais abaixo: a frase dizia que a análise partia
+// apenas das manchetes e dos resumos públicos. Deixou de ser verdade quando o
+// redator passou a ler as reportagens para extrair os fatos, e ela aparece em
+// toda página do site — por isso foi reescrita para descrever o processo real.
+// Este comentário fica no frontmatter de propósito: comentário HTML no template
+// é renderizado, e a versão antiga da frase acabava viajando no código-fonte.
 ---
 
 <Layout
@@ -209,10 +216,6 @@ const catInfo = data ? (categoryLabels[data.category] || { label: data.category,
               </li>
             ))}
           </ul>
-          <!-- Dizia "a partir das manchetes e resumos públicos". Deixou de ser verdade
-               quando o redator passou a ler as reportagens das fontes para extrair os
-               fatos. A frase aparece em toda página do site: precisa descrever o
-               processo real. -->
           <p class="text-xs text-gray-500 mt-4 leading-relaxed">
             Esta análise é original do i-a-trend e foi elaborada a partir das reportagens
             publicadas pelas fontes acima, consultadas para apuração dos fatos. O crédito pela
