@@ -32,8 +32,23 @@ const isInArticle = layout === 'in-article';
          data-full-width-responsive="true"></ins>
   )}
   <!-- is:inline impede que o Astro agrupe este script num único módulo:
-       sem isso, o push() roda uma vez só e o segundo bloco fica sempre vazio. -->
+       sem isso, o push() roda uma vez só e o segundo bloco fica sempre vazio.
+
+       O push espera o load. Rodando durante o parse, o <ins> ainda não tem
+       largura calculada e a biblioteca aborta com "adsbygoogle.push() error:
+       No slot size for availableWidth=0". Os três blocos ficavam com
+       data-ad-status nulo, ou seja, nunca chegavam a ser processados. -->
   <script is:inline>
-    (adsbygoogle = window.adsbygoogle || []).push({});
+    (function () {
+      function push() {
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+          console.warn('adsbygoogle:', e && e.message);
+        }
+      }
+      if (document.readyState === 'complete') push();
+      else window.addEventListener('load', push, { once: true });
+    })();
   </script>
 </div>
