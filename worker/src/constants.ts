@@ -1,7 +1,3 @@
-export const DAILY_LIMIT = 10;
-export const TIMEZONE = 'America/Sao_Paulo';
-export const CONTENT_PATH = 'src/content/news';
-
 export const CATEGORY_WEIGHTS: Record<string, number> = {
   'ia-automacao': 4,
   'negocios-tech': 3,

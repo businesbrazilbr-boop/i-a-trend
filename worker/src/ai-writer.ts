@@ -10,22 +10,25 @@
  * propria. Nunca recebe o corpo de nenhum artigo, porque nunca o buscamos.
  */
 
-import { significantWords, setSimilarity } from './text';
+import { significantWords, setSimilarity, stripAccents, verbatimOverlap } from './text';
 
 export const WRITER_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 /**
- * ~270 palavras. Abaixo disso o texto nao sustenta analise propria.
+ * ~500 palavras. Bate com MIN_CHARS_PARA_AD_INTERCALADO do site (3000), ou seja,
+ * todo artigo publicado comporta o bloco de anuncio no meio sem cair no padrao
+ * "anuncios excedem o conteudo", que e' reprovado na revisao do AdSense.
  *
- * Era 2200 (~370 palavras) e o prompt pedia 500 a 800 palavras avisando que
- * "textos curtos serao rejeitados". Havia piso e nenhum teto, entao o modelo
- * batia a meta enchendo linguica: duas conclusoes e a mesma frase repetida.
- * Piso mais baixo + teto + checagem de repeticao tiram o incentivo a esticar.
+ * Comecou em 3800 (~630 palavras) e derrubou TREZE temas bons num unico ciclo:
+ * este modelo entrega entre 1.900 e 3.100 caracteres de forma consistente, por
+ * mais que o prompt peca 700 a 900 palavras. O piso agora e' alcancavel, e o que
+ * fecha a diferenca e' a segunda passada de ampliacao (expandBody), nao a
+ * insistencia no prompt.
  */
-const MIN_BODY_CHARS = 1600;
+export const MIN_BODY_CHARS = 3000;
 
-/** ~620 palavras. Daqui para cima esta' pipeline nao acrescenta fato, acrescenta repeticao. */
-const MAX_BODY_CHARS = 3800;
+/** ~1150 palavras. Daqui para cima nao vem informacao, vem repeticao. */
+export const MAX_BODY_CHARS = 7000;
 
 /** Uma manchete real tem sujeito e verbo; menos que isto costuma ser rotulo generico. */
 const MIN_TITLE_WORDS = 5;
@@ -43,11 +46,24 @@ const PARAGRAPH_REPEAT_THRESHOLD = 0.42;
 const FECHO = /^\s*(em resumo|em conclus[ãa]o|em suma|resumindo|concluindo|por fim|em s[ií]ntese)\b/i;
 
 /**
- * Verbos de especulacao. "pode ajudar", "pode contribuir", "pode levar a
- * melhorias" nao informam nada; um texto feito so' disso e' conversa fiada com
- * cara de analise.
+ * Construcoes de especulacao. Texto feito so' disto e' conversa fiada com cara
+ * de analise, e e' o que o AdSense recusa como conteudo de baixo valor.
+ *
+ * A lista anterior so' tinha pode/podem/poderia/poderiam, e deixou passar um
+ * artigo que dizia "têm o potencial de impactar" e "têm o potencial de
+ * revolucionar" — a mesma jogada por outra porta. Aplicada sobre o texto sem
+ * acento, para que "poderá" e "poderão" tambem casem.
  */
-const ESPECULACAO = /\b(pode|podem|poderia|poderiam)\b/gi;
+const ESPECULACAO = /\b(pode|podem|poderia|poderiam|podera|poderao|potencial de|tende a|tendem a|possivelmente|provavelmente|eventualmente)\b/g;
+
+/**
+ * Palavras seguidas iguais as da fonte que ja' configuram copia.
+ *
+ * Oito e' curto o bastante para pegar frase reaproveitada e longo o bastante
+ * para nao disparar em construcao comum ("de acordo com a empresa, o novo
+ * modelo"). Ver verbatimOverlap em text.ts.
+ */
+const VERBATIM_WORDS = 8;
 
 export interface SourceRef {
   name: string;
@@ -56,7 +72,16 @@ export interface SourceRef {
 
 export interface TopicInput {
   /** Titulos + resumos publicos das fontes que falam do mesmo assunto. */
-  items: Array<{ title: string; excerpt: string; source: SourceRef }>;
+  items: Array<{
+    title: string;
+    excerpt: string;
+    source: SourceRef;
+    /**
+     * Texto da materia de origem, so' como material de apoio para os fatos.
+     * Nunca deve reaparecer no artigo: verbatimOverlap barra isso na saida.
+     */
+    reference?: string;
+  }>;
   category: string;
 }
 
@@ -77,11 +102,19 @@ const SYSTEM_PROMPT = `Você é editor do i-a-trend, um site brasileiro sobre in
 
 Você recebe manchetes e resumos públicos de vários veículos sobre um mesmo assunto. Sua tarefa é escrever uma ANÁLISE PRÓPRIA — não um resumo, não uma reescrita.
 
+Junto com as manchetes você recebe MATERIAL DE APOIO: o texto das matérias de origem.
+Ele existe para você saber os FATOS — o que foi anunciado, por quem, com que números.
+Não é rascunho, não é texto para reaproveitar.
+
 REGRAS ABSOLUTAS:
-- NUNCA parafraseie um único veículo. Se só há uma fonte, escreva sobre o CONTEXTO do fato, não sobre o texto dela.
-- NUNCA invente números, datas, valores, nomes ou declarações. Use apenas o que está nos resumos. Se um dado não está lá, não o mencione.
-- NUNCA copie frases dos resumos. Formule tudo com suas próprias palavras.
-- O valor do texto está no ÂNGULO: o que isso muda para uma empresa brasileira em custo, processo, prazo ou risco. Essa análise é sua, não das fontes.
+- NUNCA copie frases do material de apoio. Reformule tudo. Qualquer sequência de oito
+  palavras seguidas igual à do original faz o artigo ser rejeitado automaticamente.
+- NUNCA reescreva a matéria na mesma ordem em que ela conta os fatos. Isso é spinning.
+  Comece pelo que interessa a uma empresa brasileira, não pelo lide do veículo.
+- NUNCA invente números, datas, valores, nomes ou declarações. Use apenas o que está no
+  material. Se um dado não está lá, não o mencione.
+- O valor do texto está no ÂNGULO: o que isso muda para uma empresa brasileira em custo,
+  processo, prazo ou risco. Essa análise é sua, não das fontes.
 
 ORTOGRAFIA (obrigatório):
 - Escreva em português brasileiro correto, COM TODOS OS ACENTOS E CEDILHAS.
@@ -94,35 +127,48 @@ TÍTULO (o mais importante):
 - RUIM: "IA na Automação", "Nova Fronteira na Automação", "IA avança" — genéricos demais, serão rejeitados.
 - Máximo 90 caracteres. Não copie nenhuma das manchetes recebidas.
 
-CONCRETO (obrigatório):
-- Todo dado que aparecer nos resumos — número, valor, prazo, nome de produto ou de
-  empresa — deve entrar no texto. É o que separa análise de conversa fiada.
-- Se os resumos não trazem dado nenhum, escreva sobre o mecanismo concreto: o que muda
-  no processo, em que etapa, com que custo ou que risco. Nunca sobre "o potencial da IA".
+CONCRETO (é o que separa análise de conversa fiada):
+- Extraia do material de apoio os fatos duros e ponha-os no texto: números, valores,
+  prazos, versões, nomes de produto, de empresa e de quem falou.
+- Um artigo sem nenhum dado concreto não serve. Se o material tem "dez avanços", diga
+  quais. Se tem uma cifra, use a cifra.
+- Proibido escrever sobre "o potencial da IA" em abstrato. Escreva sobre o que muda:
+  em que etapa do processo, com que custo, em que prazo, com que risco.
 
 FORMATO:
 - Tom profissional e direto.
-- Entre 350 e 550 palavras. Um texto curto e denso vale mais que um longo e repetitivo.
-- Parágrafos curtos, de 2 a 4 frases.
+- Entre 700 e 900 palavras. Só se chega lá com fatos; não se chega repetindo.
+- Parágrafos de 3 a 5 frases.
 - Comece pelo que mudou, não por "nos últimos anos...".
 - Sem markdown, sem títulos internos. Separe parágrafos com uma linha em branco.
 - Não escreva "segundo o site X" em todo parágrafo; a atribuição aparece numa seção de fontes.
+- Termine a última frase. Texto cortado no meio é rejeitado.
 
 ENCHER LINGUIÇA É MOTIVO DE REJEIÇÃO:
 - UM único parágrafo de fecho. Nunca "Em resumo" no meio e "Em conclusão" no fim.
 - Nunca repita uma ideia já dita com outras palavras. Parágrafo que não acrescenta fato
   ou consequência nova deve ser cortado, não reescrito.
-- No máximo um "pode/poderia" por parágrafo, e sempre ancorado em algo concreto.
-- Se os resumos não dão material para 350 palavras de análise real, responda
-  exatamente {"skip": true}. Recusar o tema é melhor que inventar volume.
+- No máximo uma especulação por parágrafo ("pode", "poderá", "tem o potencial de",
+  "tende a"), e sempre ancorada num fato do material.
+- Se o material de apoio não dá base para 700 palavras de análise com fatos, responda
+  apenas com a linha ###PULAR###. Recusar o tema é melhor que inventar volume.
 
-Responda SOMENTE com JSON válido, sem cercas de código, neste formato:
-{"title": "...", "excerpt": "...", "body": "...", "tags": ["...", "..."], "imagePrompt": "..."}
+Responda EXATAMENTE neste formato, sem cercas de código e sem nenhum texto fora dele:
 
-excerpt: uma frase de até 200 caracteres.
-body: o texto completo, com \\n\\n entre parágrafos.
-tags: 3 a 5 palavras-chave em minúsculas.
-imagePrompt: frase curta EM INGLÊS descrevendo objetos e cenário concretos do assunto tratado,
+###TITULO###
+o título
+###RESUMO###
+uma frase de até 200 caracteres
+###TAGS###
+3 a 5 palavras-chave em minúsculas, separadas por vírgula
+###IMAGEM###
+a descrição da ilustração, em inglês
+###CORPO###
+o texto completo, com uma linha em branco entre parágrafos
+
+Escreva os marcadores ###...### exatamente assim, cada um sozinho na sua linha.
+
+IMAGEM: frase curta EM INGLÊS descrevendo objetos e cenário concretos do assunto tratado,
 para gerar a ilustração de capa. Regras:
   - Seja específico do tema. BOM: "hospital data dashboard, medical records, chat bubbles".
     RUIM: "artificial intelligence, technology" — genérico demais.
@@ -132,8 +178,16 @@ para gerar a ilustração de capa. Regras:
 
 function buildUserPrompt(topic: TopicInput): string {
   const fontes = topic.items
-    .map((it, i) => `[${i + 1}] ${it.source.name}\nManchete: ${it.title}\nResumo: ${it.excerpt || '(sem resumo)'}`)
-    .join('\n\n');
+    .map((it, i) => {
+      const bloco = [
+        `[${i + 1}] ${it.source.name}`,
+        `Manchete: ${it.title}`,
+        `Resumo: ${it.excerpt || '(sem resumo)'}`,
+      ];
+      if (it.reference) bloco.push(`Material de apoio (NAO copiar):\n${it.reference}`);
+      return bloco.join('\n');
+    })
+    .join('\n\n---\n\n');
 
   return `Categoria: ${topic.category}
 
@@ -144,44 +198,107 @@ ${fontes}
 Escreva a analise do i-a-trend sobre este assunto, seguindo as regras.`;
 }
 
-/**
- * Normaliza a saida do Workers AI, que varia conforme o modelo e a versao:
- *  - { response: "<texto>" }              formato antigo
- *  - { response: { ... } }                ja' desserializado quando a saida e' JSON
- *  - { choices: [{ message: { content }}]} formato compativel com OpenAI
- *
- * Tratar tudo como string quebrava com "raw.trim is not a function" e o artigo
- * era descartado silenciosamente.
- */
-function extractPayload(result: any): any | null {
-  if (!result) return null;
-
-  if (result.response && typeof result.response === 'object') return result.response;
-  if (typeof result.response === 'string') return parseJsonLoose(result.response);
-
+/** Texto cru da resposta, seja qual for o formato em que o Workers AI o embrulhe. */
+function rawText(result: any): string {
+  if (!result) return '';
+  if (typeof result.response === 'string') return result.response;
   const content = result?.choices?.[0]?.message?.content;
-  if (typeof content === 'string') return parseJsonLoose(content);
-  if (content && typeof content === 'object') return content;
-
-  return null;
+  if (typeof content === 'string') return content;
+  if (typeof result === 'string') return result;
+  return '';
 }
 
-/** Extrai o primeiro objeto JSON da resposta, tolerando cercas de codigo e texto em volta. */
-function parseJsonLoose(raw: string): any | null {
-  let s = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  const start = s.indexOf('{');
-  const end = s.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  s = s.slice(start, end + 1);
+interface Campos {
+  skip: boolean;
+  title: string;
+  excerpt: string;
+  tags: string[];
+  imagePrompt: string;
+  body: string;
+}
+
+/**
+ * Le a saida em blocos ###MARCADOR###.
+ *
+ * Antes o modelo devolvia JSON, e num ciclo inteiro SEIS temas cairam com
+ * "nao consegui extrair JSON da resposta": um corpo de 700 palavras com aspas e
+ * quebras de linha por dentro quase sempre produz JSON invalido, e nenhuma
+ * tentativa de reparo cobre todos os casos. Marcadores em linha propria nao tem
+ * escaping, entao nao ha' o que quebrar.
+ */
+function parseDelimited(raw: string): Campos | null {
+  const texto = raw.replace(/```/g, '').trim();
+  if (!texto) return null;
+  if (/###\s*PULAR\s*###/i.test(texto)) {
+    return { skip: true, title: '', excerpt: '', tags: [], imagePrompt: '', body: '' };
+  }
+
+  const bloco = (nome: string): string => {
+    const re = new RegExp(`###\\s*${nome}\\s*###([\\s\\S]*?)(?=###\\s*[A-ZÇÃÉÍÓÚ]+\\s*###|$)`, 'i');
+    const m = re.exec(texto);
+    return m ? m[1].trim() : '';
+  };
+
+  const body = bloco('CORPO');
+  const title = bloco('TITULO');
+  if (!body || !title) return null;
+
+  return {
+    skip: false,
+    title,
+    excerpt: bloco('RESUMO'),
+    tags: bloco('TAGS').split(/[,;\n]/).map(t => t.toLowerCase().trim()).filter(Boolean).slice(0, 5),
+    imagePrompt: bloco('IMAGEM'),
+    body,
+  };
+}
+
+/**
+ * Segunda passada: pede ao modelo que amplie o proprio texto com mais fatos.
+ *
+ * Nao e' "escreva mais": e' "volte ao material e traga o que ficou de fora". A
+ * diferenca importa, porque um pedido generico de tamanho e' exatamente o que
+ * produzia dupla conclusao e paragrafos repetidos. O resultado passa pelas mesmas
+ * checagens do texto original, entao uma ampliacao preguicosa e' barrada depois.
+ */
+async function expandBody(ai: any, userPrompt: string, body: string): Promise<string | null> {
   try {
-    return JSON.parse(s);
-  } catch {
-    // Modelos as vezes deixam quebras de linha cruas dentro das strings.
-    try {
-      return JSON.parse(s.replace(/\n/g, '\\n'));
-    } catch {
-      return null;
-    }
+    const result = await ai.run(WRITER_MODEL, {
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: `###CORPO###\n${body}` },
+        {
+          role: 'user',
+          content: `O texto ficou curto. Reescreva-o inteiro, mais longo, entre 700 e 900 palavras.
+
+COMO AMPLIAR (nesta ordem):
+- Volte ao material de apoio e traga os fatos que você deixou de fora: números, nomes,
+  versões, prazos, valores, quem disse o quê.
+- Explique o mecanismo: como a coisa funciona, em que etapa do processo entra, o que
+  substitui, o que exige de quem for adotar.
+- Acrescente a consequência prática para uma empresa brasileira, ancorada nesses fatos.
+
+PROIBIDO: repetir com outras palavras algo que o texto já diz, acrescentar um segundo
+parágrafo de conclusão, ou encher com "pode", "poderá" e "tem o potencial de".
+Se não houver mais fato no material, responda apenas ###PULAR###.
+
+Responda só com o bloco ###CORPO### seguido do texto.`,
+        },
+      ],
+      max_tokens: 5000,
+      temperature: 0.6,
+    });
+
+    const texto = rawText(result).replace(/```/g, '').trim();
+    if (!texto || /###\s*PULAR\s*###/i.test(texto)) return null;
+
+    const m = /###\s*CORPO\s*###([\s\S]*)/i.exec(texto);
+    const ampliado = (m ? m[1] : texto).trim();
+    return ampliado.length > 0 ? ampliado : null;
+  } catch (e) {
+    console.warn('[writer] Falha ao ampliar o texto:', e);
+    return null;
   }
 }
 
@@ -190,40 +307,49 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
 
   const sources = topic.items.map(it => it.source);
 
+  const userPrompt = buildUserPrompt(topic);
+
   try {
     console.log(`[writer] Sintetizando ${topic.items.length} fonte(s) em ${topic.category}...`);
     const result = await ai.run(WRITER_MODEL, {
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(topic) },
+        { role: 'user', content: userPrompt },
       ],
-      // Folga generosa de proposito: o corpo sozinho passa de 600 tokens e, se a
-      // resposta for cortada no meio, o JSON fica invalido e o tema inteiro e'
-      // descartado — falha silenciosa e cara.
-      max_tokens: 3500,
+      // Folga generosa: 700 a 900 palavras passam de 1.500 tokens e uma resposta
+      // cortada no meio invalida o tema inteiro — falha silenciosa e cara.
+      max_tokens: 5000,
       temperature: 0.6,
     });
 
-    const parsed = extractPayload(result);
+    const parsed = parseDelimited(rawText(result));
     if (!parsed) {
-      console.error('[writer] Nao consegui extrair JSON da resposta, descartando tema.');
+      console.error('[writer] Resposta fora do formato esperado, descartando tema.');
       return null;
     }
 
     // Saida de recusa prevista no prompt: melhor o modelo dizer que o tema nao
     // da' materia do que produzir 500 palavras de especulacao para preencher.
-    if (parsed.skip === true) {
+    if (parsed.skip) {
       console.warn('[writer] Modelo recusou o tema por falta de material.');
       return null;
     }
 
-    const title = String(parsed.title || '').trim();
-    const body = String(parsed.body || '').trim();
+    const title = parsed.title;
+    let body = parsed.body;
 
-    // Abaixo do piso o texto vira nota curta sem analise, que e' exatamente o
-    // "conteudo de baixo valor" que o AdSense recusa.
+    // Pedir "700 a 900 palavras" no prompt nao basta: este modelo entrega entre
+    // 1.900 e 3.100 caracteres com muita regularidade. Num ciclo inteiro, TREZE
+    // temas bons foram descartados so' por tamanho. Em vez de rejeitar, pedimos a
+    // ampliacao — com instrucao explicita de acrescentar fatos, nao paragrafos.
     if (body.length < MIN_BODY_CHARS) {
-      console.error(`[writer] Corpo curto demais (${body.length} < ${MIN_BODY_CHARS}), descartando.`);
+      console.log(`[writer] Corpo com ${body.length}, pedindo ampliacao ate ${MIN_BODY_CHARS}...`);
+      const ampliado = await expandBody(ai, userPrompt, body);
+      if (ampliado && ampliado.length > body.length) body = ampliado;
+    }
+
+    if (body.length < MIN_BODY_CHARS) {
+      console.error(`[writer] Corpo curto demais mesmo apos ampliar (${body.length} < ${MIN_BODY_CHARS}), descartando.`);
       return null;
     }
 
@@ -258,13 +384,33 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
       }
     }
 
-    // Mais de um verbo especulativo por paragrafo, em media, e' texto feito de
-    // "pode ajudar" e "pode contribuir" — nenhum fato, so' volume.
-    const especulacoes = (body.match(ESPECULACAO) || []).length;
+    // Mais de uma especulacao por paragrafo, em media, e' texto feito de "pode
+    // ajudar" e "tem o potencial de" — nenhum fato, so' volume.
+    const especulacoes = (stripAccents(body.toLowerCase()).match(ESPECULACAO) || []).length;
     if (paragrafos.length > 0 && especulacoes > paragrafos.length) {
       console.error(
-        `[writer] Especulativo demais (${especulacoes} "pode" em ${paragrafos.length} paragrafos), descartando.`,
+        `[writer] Especulativo demais (${especulacoes} em ${paragrafos.length} paragrafos), descartando.`,
       );
+      return null;
+    }
+
+    // Guarda anti-spinning. Desde que o redator recebe o corpo da materia de
+    // origem, esta e' a unica checagem que separa sintese propria de copia
+    // disfarcada — o prompt sozinho nao garante nada.
+    for (const it of topic.items) {
+      if (!it.reference) continue;
+      const trecho = verbatimOverlap(body, it.reference, VERBATIM_WORDS);
+      if (trecho) {
+        console.error(`[writer] Trecho copiado de ${it.source.name}: "${trecho}", descartando.`);
+        return null;
+      }
+    }
+
+    // Resposta cortada pelo limite de tokens: o ultimo paragrafo fica sem
+    // terminar e o artigo vai ao ar truncado.
+    const fim = body.trimEnd().slice(-1);
+    if (!'.!?"”)'.includes(fim)) {
+      console.error(`[writer] Texto termina sem pontuacao final ("...${body.trimEnd().slice(-40)}"), descartando.`);
       return null;
     }
 
@@ -285,17 +431,13 @@ export async function writeArticle(ai: any, topic: TopicInput): Promise<WrittenA
       return null;
     }
 
-    const tags = Array.isArray(parsed.tags)
-      ? parsed.tags.map((t: unknown) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 5)
-      : [];
-
     return {
       title: title.slice(0, 140),
-      excerpt: String(parsed.excerpt || '').trim().slice(0, 300),
+      excerpt: parsed.excerpt.slice(0, 300),
       body,
-      tags,
+      tags: parsed.tags,
       sources,
-      imagePrompt: String(parsed.imagePrompt || '').trim().slice(0, 300),
+      imagePrompt: parsed.imagePrompt.slice(0, 300),
     };
   } catch (error) {
     console.error('[writer] Erro ao gerar artigo:', error);

@@ -1,14 +1,6 @@
-import { getAllArticles, getDB, articleImageSrc } from '@/utils/d1';
+import { getAllArticles, getCategoriesWithArticles, getDB, articleImageSrc } from '@/utils/d1';
 
 const SITE = 'https://i-a-trend.com';
-
-const CATEGORIES = [
-  'ia-automacao',
-  'negocios-tech',
-  'startups',
-  'marketing-tech',
-  'tech-geral',
-];
 
 const STATIC_PAGES = ['/sobre', '/contato', '/privacidade'];
 
@@ -32,10 +24,13 @@ ${lastmod ? `    <lastmod>${escapeXml(lastmod)}</lastmod>\n` : ''}${image ? `   
 export async function GET(context: any) {
   const db = getDB(context);
   const articles = db ? await getAllArticles(db) : [];
+  // Só as categorias com artigo. A lista fixa entregava ao Google quatro páginas
+  // vazias que diziam que o site ainda estava sendo populado.
+  const categorias = db ? await getCategoriesWithArticles(db) : [];
 
   const entries: string[] = [
     urlEntry(`${SITE}/`, '1.0', 'daily'),
-    ...CATEGORIES.map(c => urlEntry(`${SITE}/categoria/${c}`, '0.8', 'daily')),
+    ...categorias.map(c => urlEntry(`${SITE}/categoria/${c}`, '0.8', 'daily')),
     ...STATIC_PAGES.map(p => urlEntry(`${SITE}${p}`, '0.5', 'monthly')),
     ...articles.map(a => {
       // Só declaramos imagens nossas. Antes o sitemap listava as URLs dos CDNs

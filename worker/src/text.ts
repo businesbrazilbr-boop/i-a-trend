@@ -81,3 +81,39 @@ export function setSimilarity(sa: Set<string>, sb: Set<string>): number {
 export function titleSimilarity(a: string, b: string): number {
   return setSimilarity(significantWords(a), significantWords(b));
 }
+
+/** Palavras normalizadas, para comparar sequencias sem tropecar em acento ou pontuacao. */
+function tokens(input: string): string[] {
+  return stripAccents(input.toLowerCase())
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * Procura uma sequencia de `n` palavras do texto de origem copiada no artigo.
+ * Devolve a sequencia encontrada, ou null se nao houver.
+ *
+ * Esta e' a defesa de verdade contra o spinning. Desde que o redator passou a
+ * receber o corpo da materia de origem (fetch-source.ts), instrucao no prompt
+ * deixou de bastar: o modelo pode reproduzir trechos sem que nenhuma checagem
+ * de estrutura perceba. Oito palavras iguais em sequencia praticamente nao
+ * acontecem por acaso entre dois textos escritos de forma independente, mas
+ * acontecem o tempo todo quando um foi copiado do outro.
+ */
+export function verbatimOverlap(artigo: string, origem: string, n = 8): string | null {
+  const a = tokens(artigo);
+  const o = tokens(origem);
+  if (a.length < n || o.length < n) return null;
+
+  const sequenciasOrigem = new Set<string>();
+  for (let i = 0; i + n <= o.length; i++) {
+    sequenciasOrigem.add(o.slice(i, i + n).join(' '));
+  }
+
+  for (let i = 0; i + n <= a.length; i++) {
+    const seq = a.slice(i, i + n).join(' ');
+    if (sequenciasOrigem.has(seq)) return seq;
+  }
+  return null;
+}

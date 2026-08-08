@@ -1,3 +1,14 @@
+---
+import { getDB, getCategoriesWithArticles } from '@/utils/d1';
+import { CATEGORY_NAV } from '@/consts';
+
+// Mesmo motivo do Header: os links fixos levavam a categorias vazias, em todas as
+// páginas do site. Aqui faltava ainda 'tech-geral', que existia no menu do topo.
+const db = getDB(Astro);
+const comArtigos = db ? await getCategoriesWithArticles(db) : [];
+const nav = CATEGORY_NAV.filter(c => comArtigos.includes(c.slug));
+---
+
 <footer class="bg-gray-900 text-gray-300 mt-16">
   <div class="container mx-auto py-10">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -8,15 +19,18 @@
           As tendências, ferramentas e casos de uso que você precisa conhecer.
         </p>
       </div>
-      <div>
-        <h4 class="text-white font-semibold mb-3">Categorias</h4>
-        <ul class="space-y-2 text-sm">
-          <li><a href="/categoria/ia-automacao" class="hover:text-primary-400 transition-colors">IA & Automação</a></li>
-          <li><a href="/categoria/negocios-tech" class="hover:text-primary-400 transition-colors">Negócios & Tech</a></li>
-          <li><a href="/categoria/startups" class="hover:text-primary-400 transition-colors">Startups</a></li>
-          <li><a href="/categoria/marketing-tech" class="hover:text-primary-400 transition-colors">Marketing & Tech</a></li>
-        </ul>
-      </div>
+      {nav.length > 0 && (
+        <div>
+          <h4 class="text-white font-semibold mb-3">Categorias</h4>
+          <ul class="space-y-2 text-sm">
+            {nav.map(c => (
+              <li>
+                <a href={`/categoria/${c.slug}`} class="hover:text-primary-400 transition-colors">{c.label}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div>
         <h4 class="text-white font-semibold mb-3">Links</h4>
         <ul class="space-y-2 text-sm">

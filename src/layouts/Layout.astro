@@ -10,6 +10,8 @@ interface Props {
   author?: string;
   section?: string;
   tags?: string[];
+  /** Mantem a pagina fora do indice. Usado em paginas sem conteudo proprio. */
+  noindex?: boolean;
 }
 
 const {
@@ -23,6 +25,7 @@ const {
   author = 'i-a-trend',
   section,
   tags = [],
+  noindex = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, 'https://i-a-trend.com').toString();
@@ -35,6 +38,7 @@ const canonicalURL = new URL(Astro.url.pathname, 'https://i-a-trend.com').toStri
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="generator" content={Astro.generator} />
     <link rel="canonical" href={canonicalURL} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
 
     <title>{title} | i-a-trend</title>
     <meta name="title" content={title} />

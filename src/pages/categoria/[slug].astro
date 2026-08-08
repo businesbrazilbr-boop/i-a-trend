@@ -34,6 +34,7 @@ const descs: Record<string, string> = {
   title={`${labels[slug] || slug} | i-a-trend`}
   description={descs[slug] || ''}
   url={`/categoria/${slug}`}
+  noindex={filtered.length === 0}
 >
   <Header slot="header" />
 
@@ -59,9 +60,11 @@ const descs: Record<string, string> = {
         </div>
       </>
     ) : (
-      <div class="text-center py-16 text-gray-400">
-        <p class="text-lg">Nenhuma notícia nesta categoria ainda.</p>
-        <p class="text-sm mt-2">Aguardando o Worker popular o conteúdo...</p>
+      <div class="text-center py-16">
+        <p class="text-lg text-gray-500">Ainda não publicamos nada nesta editoria.</p>
+        <p class="mt-4">
+          <a href="/" class="text-primary-600 hover:underline">Ver as últimas notícias</a>
+        </p>
       </div>
     )}
   </section>

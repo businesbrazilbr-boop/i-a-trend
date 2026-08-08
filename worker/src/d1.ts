@@ -83,29 +83,21 @@ export async function getArticlesForMarkdown(d1: D1Database, since: string): Pro
 }
 
 export async function initDatabase(d1: D1Database): Promise<void> {
-  await d1.exec(`
-    CREATE TABLE IF NOT EXISTS articles (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      slug TEXT NOT NULL,
-      excerpt TEXT,
-      content TEXT,
-      content_full TEXT,
-      source_url TEXT NOT NULL UNIQUE,
-      source_name TEXT NOT NULL,
-      category TEXT NOT NULL DEFAULT 'tech-geral',
-      published_at TEXT NOT NULL,
-      image_url TEXT,
-      image_key TEXT,
-      sources TEXT DEFAULT '[]',
-      tags TEXT DEFAULT '[]',
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category);
-    CREATE INDEX IF NOT EXISTS idx_articles_source_url ON articles(source_url);
-    CREATE INDEX IF NOT EXISTS idx_articles_created ON articles(created_at);
-  `);
+  // d1.exec() separa os comandos por QUEBRA DE LINHA, entao um CREATE TABLE
+  // escrito em varias linhas chegava picado e todo ciclo comecava com
+  // "D1_EXEC_ERROR: Error in line 1: CREATE TABLE IF NOT EXISTS articles (:
+  // incomplete input". O erro era capturado e ignorado, mas sujava o log de
+  // producao e escondia falhas de verdade. Cada comando agora vai numa linha so'.
+  const comandos = [
+    "CREATE TABLE IF NOT EXISTS articles (id TEXT PRIMARY KEY, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT, content TEXT, content_full TEXT, source_url TEXT NOT NULL UNIQUE, source_name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'tech-geral', published_at TEXT NOT NULL, image_url TEXT, image_key TEXT, sources TEXT DEFAULT '[]', tags TEXT DEFAULT '[]', created_at TEXT NOT NULL)",
+    'CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category)',
+    'CREATE INDEX IF NOT EXISTS idx_articles_source_url ON articles(source_url)',
+    'CREATE INDEX IF NOT EXISTS idx_articles_created ON articles(created_at)',
+  ];
+  for (const sql of comandos) {
+    await d1.prepare(sql).run();
+  }
 
   // Migracao para bancos criados antes destas colunas. ALTER TABLE falha se a
   // coluna ja' existe, e nao ha' "IF NOT EXISTS" para colunas no SQLite.

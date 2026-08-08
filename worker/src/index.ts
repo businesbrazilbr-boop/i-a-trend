@@ -2,7 +2,10 @@ import { ulid } from 'ulid';
 import slugify from 'slugify';
 import { fetchAndParseFeed } from './rss';
 import { initDatabase, insertArticle, getExistingUrls } from './d1';
-import { writeArticle, WRITER_MODEL, type SourceRef } from './ai-writer';
+import {
+  writeArticle, WRITER_MODEL, MIN_BODY_CHARS, MAX_BODY_CHARS, type SourceRef,
+} from './ai-writer';
+import { fetchSourceText } from './fetch-source';
 import { generateAndStoreImage } from './image';
 import { decodeEntities, significantWords, setSimilarity } from './text';
 import { getDailyCount, getLastRun, setLastRun } from './kv';
@@ -29,8 +32,26 @@ const SIMILARITY_THRESHOLD = 0.45;
 /** Teto de fontes por tema. Um assunto real raramente passa disto. */
 const MAX_ITEMS_PER_TOPIC = 6;
 
-/** Maximo de artigos por veiculo num mesmo ciclo, para o site nao virar monotema. */
-const MAX_PER_SOURCE = 2;
+/**
+ * Maximo de artigos por veiculo num mesmo ciclo, para o site nao virar monotema.
+ *
+ * Era 2. Com poucas fontes primarias ativas num dia, 2 tornava impossivel fechar
+ * a cota de 5 mesmo havendo material bom. 3 mantem variedade e deixa o ciclo
+ * fechar.
+ */
+const MAX_PER_SOURCE = 3;
+
+/** Fontes por tema cujo texto vale a pena buscar. Alem disso e' latencia sem ganho. */
+const MAX_FETCH_POR_TEMA = 3;
+
+/**
+ * Minimo de material de apoio para tentar escrever.
+ *
+ * Sem isto o redator volta a receber so' manchete e resumo, nao alcanca o piso
+ * de 3800 caracteres e enche o texto de especulacao para chegar la'. Melhor
+ * pular o tema antes de gastar uma chamada ao modelo.
+ */
+const MIN_REFERENCE_CHARS = 600;
 
 /** Dois temas acima disto sao a mesma noticia com outra roupagem. */
 const NEAR_DUPLICATE_THRESHOLD = 0.5;
@@ -226,24 +247,28 @@ async function runPipeline(env: Env): Promise<{ added: number; message: string }
   const topics = clusterTopics(candidatos);
   console.log(`[i-a-trend] ${novos.length} novos, ${candidatos.length} candidatos, ${topics.length} temas.`);
 
-  const comCobertura = topics.filter(t => t.items.length >= MIN_SOURCES_PREFERRED);
-
-  // MIN_SOURCES_PREFERRED era so' uma ordenacao: os temas de fonte unica caiam
-  // em 'restantes' e enchiam a fila do mesmo jeito. Os artigos publicados no
-  // dia 06/08 tinham todos UMA fonte, exatamente o que o comentario da constante
-  // previa ("tende a produzir parafrase").
+  // Fila por ordem de preferencia, nao por score puro. O que decide a qualidade
+  // do artigo e' quanto material honesto existe para sintetizar:
   //
-  // Agora fonte unica so' passa quando a fonte e' primaria: ai ela e' a origem
-  // do fato (a propria OpenAI anunciando seu modelo), nao um veiculo reescrevendo
-  // terceiros. Com uma unica fonte de descobrimento nao ha' o que sintetizar.
+  //  1. varias fontes  — da' para cruzar versoes, e' sintese de verdade;
+  //  2. fonte unica primaria — a origem anunciando o proprio fato (OpenAI sobre
+  //     seu modelo); nao e' parafrase de terceiro;
+  //  3. fonte unica de descobrimento — ultimo recurso. So' entra porque agora
+  //     buscamos o texto da materia, entao ha' o que sintetizar; o risco de
+  //     virar spinning fica com verbatimOverlap, no redator.
+  const comCobertura = topics.filter(t => t.items.length >= MIN_SOURCES_PREFERRED);
   const fonteUnicaDeOrigem = topics.filter(
     t => t.items.length < MIN_SOURCES_PREFERRED && t.items[0].tipo === 'primaria',
   );
+  const fonteUnicaDescobrimento = topics.filter(
+    t => t.items.length < MIN_SOURCES_PREFERRED && t.items[0].tipo !== 'primaria',
+  );
 
-  // Tenta mais temas do que a cota. O redator rejeita saidas fracas (titulo
-  // generico ou texto curto) e, sem folga, um ciclo com muitas rejeicoes
-  // publicaria bem menos que o previsto. Para assim que atingir DAILY_LIMIT.
-  const fila = [...comCobertura, ...fonteUnicaDeOrigem].slice(0, DAILY_LIMIT * 4);
+  // Folga grande de proposito. Cada tema pode cair por falta de material de apoio,
+  // por repeticao, por especulacao ou por trecho copiado; com folga curta um ciclo
+  // com muitas rejeicoes fecha bem abaixo da cota. Para assim que atingir DAILY_LIMIT.
+  const fila = [...comCobertura, ...fonteUnicaDeOrigem, ...fonteUnicaDescobrimento]
+    .slice(0, DAILY_LIMIT * 6);
 
   console.log(`[i-a-trend] ${fila.length} temas na fila para publicar ${DAILY_LIMIT}.`);
 
@@ -274,10 +299,23 @@ async function runPipeline(env: Env): Promise<{ added: number; message: string }
       continue;
     }
 
-    const escrito = await writeArticle(env.AI, {
-      items: topic.items.map(i => ({ title: i.title, excerpt: i.excerpt, source: i.source })),
-      category: topic.category,
-    });
+    // Material de apoio buscado so' agora, para o tema que vai mesmo ser escrito.
+    // Buscar para a fila inteira seriam dezenas de requisicoes por ciclo.
+    const itens = await Promise.all(
+      topic.items.slice(0, MAX_FETCH_POR_TEMA).map(async i => ({
+        title: i.title,
+        excerpt: i.excerpt,
+        source: i.source,
+        reference: await fetchSourceText(i.source.url),
+      })),
+    );
+
+    if (!itens.some(i => i.reference.length >= MIN_REFERENCE_CHARS)) {
+      console.log(`[i-a-trend] Sem material de apoio para "${principal.title.slice(0, 50)}", pulando.`);
+      continue;
+    }
+
+    const escrito = await writeArticle(env.AI, { items: itens, category: topic.category });
 
     if (!escrito) {
       console.warn(`[i-a-trend] Tema descartado pelo redator: "${principal.title.slice(0, 60)}"`);
@@ -341,6 +379,11 @@ export default {
         dailyCount: await getDailyCount(env.IAS_CACHE, getDateBR()),
         date: getDateBR(),
         lastRun: await getLastRun(env.IAS_CACHE),
+        // Assinatura do codigo que esta' realmente no ar. Um ciclo ja' rodou
+        // contra a versao anterior logo apos um deploy, e so' descobrimos isso
+        // depois, medindo os artigos publicados. Confira estes valores antes de
+        // disparar /run.
+        writer: { minBodyChars: MIN_BODY_CHARS, maxBodyChars: MAX_BODY_CHARS, usaMaterialDeApoio: true },
       });
     }
 

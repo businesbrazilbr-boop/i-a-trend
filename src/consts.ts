@@ -1,4 +1,19 @@
 /**
+ * Categorias do menu, na ordem em que aparecem.
+ *
+ * O Header só renderiza as que tiverem artigo — ver getCategoriesWithArticles.
+ * Estava tudo escrito à mão no Header e repetido no sitemap, que era como as
+ * quatro categorias vazias acabavam linkadas em toda página do site.
+ */
+export const CATEGORY_NAV = [
+  { slug: 'ia-automacao', label: 'IA & Automação' },
+  { slug: 'negocios-tech', label: 'Negócios' },
+  { slug: 'startups', label: 'Startups' },
+  { slug: 'marketing-tech', label: 'Marketing' },
+  { slug: 'tech-geral', label: 'Tech Geral' },
+];
+
+/**
  * Blocos de anúncio do AdSense.
  *
  * Os três apontam para o mesmo slot porque hoje só existe uma unidade criada no

@@ -93,6 +93,23 @@ export async function getArticlesByCategory(db: D1Database, category: string): P
   return (results || []).map(rowToArticle);
 }
 
+/**
+ * Categorias que hoje tem pelo menos um artigo.
+ *
+ * O menu e o sitemap listavam as cinco categorias fixas. Como todo o conteudo
+ * cai em 'ia-automacao', as outras quatro eram paginas vazias com o texto
+ * "Aguardando o Worker popular o conteudo" — um aviso de site em construcao,
+ * linkado na navegacao principal e entregue ao Google no sitemap. E' motivo de
+ * reprovacao no AdSense. Agora so' aparece o que tem conteudo de verdade.
+ */
+export async function getCategoriesWithArticles(db: D1Database): Promise<string[]> {
+  const { results } = await safeAll(
+    db,
+    'SELECT category, COUNT(*) AS n FROM articles GROUP BY category HAVING n > 0',
+  );
+  return (results || []).map(r => String((r as any).category)).filter(Boolean);
+}
+
 export async function getRelatedArticles(db: D1Database, category: string, slug: string, limit = 3): Promise<ArticleEntry[]> {
   const { results } = await safeAll(db, 'SELECT * FROM articles WHERE category = ? AND slug != ? ORDER BY published_at DESC LIMIT ?', category, slug, limit);
   return (results || []).map(rowToArticle);

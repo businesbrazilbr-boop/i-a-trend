@@ -1,3 +1,15 @@
+---
+import { getDB, getCategoriesWithArticles } from '@/utils/d1';
+import { CATEGORY_NAV } from '@/consts';
+
+// Só entram no menu as categorias que têm artigo. As cinco estavam fixas aqui, e
+// como todo o conteúdo cai em 'ia-automacao', quatro links levavam a uma página
+// vazia dizendo que o site ainda estava sendo populado — em todas as páginas.
+const db = getDB(Astro);
+const comArtigos = db ? await getCategoriesWithArticles(db) : [];
+const nav = CATEGORY_NAV.filter(c => comArtigos.includes(c.slug));
+---
+
 <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
   <nav class="container mx-auto flex items-center justify-between h-14">
     <a href="/" class="flex items-center gap-2 group">
@@ -7,20 +19,19 @@
     </a>
 
     <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
-      <a href="/categoria/ia-automacao" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
-        IA & Automação
+      {nav.map(c => (
+        <a
+          href={`/categoria/${c.slug}`}
+          class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap"
+        >
+          {c.label}
+        </a>
+      ))}
+      <a href="/sobre" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
+        Sobre
       </a>
-      <a href="/categoria/negocios-tech" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
-        Negócios
-      </a>
-      <a href="/categoria/startups" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
-        Startups
-      </a>
-      <a href="/categoria/marketing-tech" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
-        Marketing
-      </a>
-      <a href="/categoria/tech-geral" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
-        Tech Geral
+      <a href="/contato" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-full transition-colors whitespace-nowrap">
+        Contato
       </a>
     </div>
   </nav>
